@@ -342,7 +342,7 @@ var S = {
   tab:"today", openRelease:null, relView:"calendar",
   cal:(function(){var d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
   qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null,
-  onboarded:true, intro:0, calFilter:"releases"
+  onboarded:true, intro:0, calFilter:"releases", dateEdit:null
 };
 var planSel = {platforms:["OnlyFans"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); }
@@ -429,6 +429,27 @@ function deleteRelease(rid){
   S.posts=S.posts.filter(function(p){return p.releaseId!==rid;});
   S.openRelease=null; flash("Release removed.");
   if(sb)sb.from("releases").delete().eq("id",rid).then(function(r){ if(r.error)sbErr(r.error); });
+}
+function changeReleaseDate(rid, newDate, shiftPosts){
+  var rel=S.releases.filter(function(r){return r.id===rid;})[0]; if(!rel)return;
+  var oldDate=rel.date;
+  var delta=Math.round((new Date(newDate+"T00:00:00")-new Date(oldDate+"T00:00:00"))/86400000);
+  rel.date=newDate;
+  if(sb)sb.from("releases").update({release_date:newDate}).eq("id",rid).then(function(r){ if(r.error)sbErr(r.error); });
+  if(shiftPosts && delta!==0){
+    var moved=0;
+    S.posts.forEach(function(p){
+      if(p.releaseId===rid){
+        p.date=addDays(p.date,delta);
+        moved++;
+        if(sb)sb.from("posts").update({post_date:p.date}).eq("id",p.id).then(function(r){ if(r.error)sbErr(r.error); });
+      }
+    });
+    flash("Release moved "+(delta>0?delta+" day"+(delta>1?"s":"")+" later":(-delta)+" day"+((-delta)>1?"s":"")+" earlier")+" — "+moved+" posts shifted.");
+  } else {
+    flash("Release date updated. Posts left where they were.");
+  }
+  render();
 }
 function releaseProgress(rid){
   var rp=S.posts.filter(function(p){return p.releaseId===rid;}); if(!rp.length)return 0;
@@ -604,6 +625,7 @@ function releaseDetail(){
     +'<div class="cc-detail-head">'+ring(releaseProgress(r.id),56,5)
       +'<div style="flex:1;min-width:0"><h2 class="cc-h2" style="margin:0">'+esc(r.name)+'</h2><p class="cc-sub" style="margin:2px 0 0">Release day '+esc(fmtDate(r.date))+' · '+rp.length+' posts</p></div>'
       +'<button class="cc-icon-btn danger" data-action="del-rel" data-id="'+r.id+'">'+ic("trash",17)+'</button></div>'
+    +'<button class="cc-ghost full" data-action="change-date" data-id="'+r.id+'" style="margin-bottom:18px">'+ic("clock")+' Change release date</button>'
     +groups
     +'<button class="cc-ghost danger full" data-action="del-rel" data-id="'+r.id+'">'+ic("trash")+' Delete release</button>'
     +'</section>';
@@ -721,6 +743,20 @@ function confirmModal(){
     +'<button class="cc-confirm-yes" data-action="confirm-yes">'+esc(S.confirm.label)+'</button></div></div></div>';
 }
 
+function dateEditModal(){
+  if(!S.dateEdit)return"";
+  var r=S.releases.filter(function(x){return x.id===S.dateEdit;})[0]; if(!r)return"";
+  var n=S.posts.filter(function(p){return p.releaseId===r.id;}).length;
+  return '<div class="cc-modal-bg" data-action="close-date"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Change Release Date</h2><button class="cc-icon-btn" data-action="close-date">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">"'+esc(r.name)+'" is currently set for '+esc(fmtDate(r.date))+', with '+n+' scheduled post'+(n===1?"":"s")+'.</p>'
+    +'<label class="cc-field"><span>New release date</span><input id="dt_new" type="date" class="cc-input" value="'+esc(r.date)+'"></label>'
+    +'<p class="cc-note" style="margin:2px 0 16px">When you move the date, do you want the posts to move with it?</p>'
+    +'<button class="cc-primary" data-action="date-shift" data-id="'+r.id+'" style="margin-bottom:10px">'+ic("check",16)+' Move date &amp; shift all posts</button>'
+    +'<button class="cc-ghost full" data-action="date-only" data-id="'+r.id+'">Change date only — leave posts where they are</button>'
+    +'</div></div>';
+}
+
 function introOverlay(){
   if(S.onboarded || S.view!=="app")return"";
   var cards=[
@@ -803,6 +839,7 @@ function render(){
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
     +tplEditorModal()
+    +dateEditModal()
     +confirmModal()
     +introOverlay();
   $("app").innerHTML=html;
@@ -849,6 +886,10 @@ document.addEventListener("click",function(e){
   if(a==="del-rel"){ var rid=id; ask("Delete this release and all of its posts? This can't be undone.",function(){deleteRelease(rid);},"Delete release"); return; }
   if(a==="close-modal"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.editing=null; render(); return; }
   if(a==="chk"){ el.classList.toggle("on"); var on=el.classList.contains("on"); var lbl=el.id==="f_winner"?" Winner":(el.id==="f_assetReady"?" Asset ready":" Caption ready"); el.innerHTML=(on?(el.id==="f_winner"?ic("star",13):ic("check",13)):"")+lbl; return; }
+  if(a==="change-date"){ S.dateEdit=id; render(); return; }
+  if(a==="close-date"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.dateEdit=null; render(); return; }
+  if(a==="date-shift"){ var nd=$("dt_new").value; if(!nd){flash("Pick a date.");return;} var rid2=id; S.dateEdit=null; changeReleaseDate(rid2,nd,true); return; }
+  if(a==="date-only"){ var nd2=$("dt_new").value; if(!nd2){flash("Pick a date.");return;} var rid3=id; S.dateEdit=null; changeReleaseDate(rid3,nd2,false); return; }
   if(a==="calfilter"){ S.calFilter=el.getAttribute("data-v"); render(); return; }
   if(a==="intro-next"){ S.intro++; render(); return; }
   if(a==="intro-skip"){ finishIntro(); return; }
