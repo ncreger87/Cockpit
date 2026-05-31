@@ -176,6 +176,15 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-check svg{width:13px;height:13px;}
 .cc-check.on{color:var(--accent);border-color:var(--accent);background:rgba(242,166,90,.1);font-weight:500;}
 .cc-modal-actions{display:flex;gap:10px;}
+.cc-link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;margin-left:6px;font-family:inherit;}
+.cc-tpl-box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:6px 14px;}
+.cc-tpl-line{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+.cc-tpl-line:last-child{border-bottom:none;}
+.cc-tpl-line em{font-size:12px;color:var(--mut2);font-style:normal;}
+.cc-tpl-row{display:flex;flex-direction:column;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:10px;}
+.cc-tpl-when{display:flex;gap:8px;}
+.cc-tpl-when .cc-num{max-width:90px;}
+.cc-tpl-rowbtns{display:flex;gap:8px;justify-content:flex-end;}
 
 .cc-confirm-bg{position:fixed;inset:0;background:rgba(6,5,9,.66);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;}
 .cc-confirm{background:var(--bg2);border:1px solid var(--line2);border-radius:18px;max-width:360px;width:100%;padding:22px;animation:fade .2s ease;}
@@ -233,47 +242,52 @@ var PLATFORMS = [
   {id:"Reddit",group:"reddit"},{id:"Instagram",group:"social"},{id:"TikTok",group:"social"}
 ];
 var PG = {}; PLATFORMS.forEach(function(p){PG[p.id]=p.group;});
-var STAGES = [
-  {id:"D7",label:"D7",offset:-7,blurb:"One week out — tease"},
-  {id:"D3",label:"D3",offset:-3,blurb:"Three days — build heat"},
-  {id:"D1",label:"D1",offset:-1,blurb:"Tomorrow — urgency"},
-  {id:"Release",label:"Release",offset:0,blurb:"Live — convert"},
-  {id:"Follow-Up",label:"Follow-Up",offset:3,blurb:"After — bump"}
+var DEFAULT_STAGES = [
+  {id:"d7",label:"D7",offset:-7},
+  {id:"d3",label:"D3",offset:-3},
+  {id:"d1",label:"D1",offset:-1},
+  {id:"release",label:"Release",offset:0},
+  {id:"followup",label:"Follow-Up",offset:3}
 ];
-var STAGE_BY = {}; STAGES.forEach(function(s){STAGE_BY[s.id]=s;});
 var STATUS_ORDER = ["Idea","Draft","Ready","Scheduled","Posted","Reviewed"];
 var STATUS_COLOR = {Idea:"#8A8A99",Draft:"#E0A23C",Ready:"#3FB68B",Scheduled:"#5B8DEF",Posted:"#9B7BE8",Reviewed:"#6B6B78"};
 var CTAS = ["Subscribe","Renew","Presale","Tip","Comment","Profile Click","None"];
-var STAGE_CTA = {D7:"Presale",D3:"Presale",D1:"Presale",Release:"Subscribe","Follow-Up":"Subscribe"};
 var WD = ["S","M","T","W","T","F","S"];
 var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-/* ====================== CAPTIONS ====================== */
-function captionScaffold(name, stage, platform){
-  var g = PG[platform];
+/* ====================== STAGE / TIMING HELPERS ====================== */
+function stageTiming(offset){ if(offset<0)return (-offset)+" day"+((-offset)>1?"s":"")+" before"; if(offset>0)return offset+" day"+(offset>1?"s":"")+" after"; return "Release day"; }
+function stageBlurb(offset){ if(offset<=-7)return "Early — tease"; if(offset<0)return "Build heat"; if(offset===0)return "Live — convert"; return "After — bump"; }
+function defaultCTA(offset){ return offset<0 ? "Presale" : "Subscribe"; }
+function timingBucket(offset){ if(offset<=-7)return "week"; if(offset<=-2)return "days"; if(offset===-1)return "tomorrow"; if(offset===0)return "release"; return "after"; }
+
+/* ====================== CAPTIONS (offset-based, works for any custom stage) ====================== */
+function captionScaffold(name, offset, platform){
+  var g = PG[platform] || "paid";
+  var b = timingBucket(offset);
   var lib = {
-    paid:{D7:'🔒 Something new drops in 7 days: "'+name+'". Lock in the presale before the price moves.',
-      D3:'3 days out from "'+name+'". Renew now so you don\'t miss the drop 👀',
-      D1:'Tomorrow. "'+name+'" goes live. Last call on the presale 🔥',
-      Release:'It\'s here — "'+name+'" is live now. Tap to unlock 💋',
-      "Follow-Up":'Still trending: "'+name+'". If you missed it, here\'s your second chance.'},
-    micro:{D7:'one week until "'+name+'" 👀 set a reminder. (link in bio)',
-      D3:'3 days. "'+name+'". you\'re not ready. presale\'s still open → bio',
-      D1:'tomorrow. "'+name+'". 🔥',
-      Release:'"'+name+'" is LIVE. you know where to go → bio',
-      "Follow-Up":'ICYMI: "'+name+'" dropped. catching up? → bio'},
-    reddit:{D7:'[Teaser] Working on "'+name+'" — dropping in a week. What do you want to see?',
-      D3:'"'+name+'" is almost here (3 days). Sneak peek inside 👀',
-      D1:'"'+name+'" drops tomorrow — here\'s a preview',
-      Release:'"'+name+'" is out now! Full set linked — feedback welcome.',
-      "Follow-Up":'Reposting "'+name+'" for anyone who missed the drop earlier this week.'},
-    social:{D7:'Counting down to "'+name+'" — 1 week 🤍 link in bio to get notified',
-      D3:'3 days until "'+name+'" ✨ are you on the list? (bio)',
-      D1:'tomorrow 🫶 "'+name+'" — link in bio',
-      Release:'"'+name+'" is live ✨ everything\'s in my bio',
-      "Follow-Up":'in case you missed it — "'+name+'" 🤍 bio'}
+    paid:{week:'🔒 Something new drops soon: "'+name+'". Lock in the presale before the price moves.',
+      days:'A few days out from "'+name+'". Renew now so you don\'t miss the drop 👀',
+      tomorrow:'Tomorrow. "'+name+'" goes live. Last call on the presale 🔥',
+      release:'It\'s here — "'+name+'" is live now. Tap to unlock 💋',
+      after:'Still trending: "'+name+'". If you missed it, here\'s your second chance.'},
+    micro:{week:'coming soon: "'+name+'" 👀 set a reminder. (link in bio)',
+      days:'almost here. "'+name+'". presale\'s still open → bio',
+      tomorrow:'tomorrow. "'+name+'". 🔥',
+      release:'"'+name+'" is LIVE. you know where to go → bio',
+      after:'ICYMI: "'+name+'" dropped. catching up? → bio'},
+    reddit:{week:'[Teaser] Working on "'+name+'" — dropping soon. What do you want to see?',
+      days:'"'+name+'" is almost here. Sneak peek inside 👀',
+      tomorrow:'"'+name+'" drops tomorrow — here\'s a preview',
+      release:'"'+name+'" is out now! Full set linked — feedback welcome.',
+      after:'Reposting "'+name+'" for anyone who missed the drop.'},
+    social:{week:'Counting down to "'+name+'" 🤍 link in bio to get notified',
+      days:'almost time for "'+name+'" ✨ are you on the list? (bio)',
+      tomorrow:'tomorrow 🫶 "'+name+'" — link in bio',
+      release:'"'+name+'" is live ✨ everything\'s in my bio',
+      after:'in case you missed it — "'+name+'" 🤍 bio'}
   };
-  return (lib[g] && lib[g][stage]) || (stage+' post for "'+name+'".');
+  return (lib[g] && lib[g][b]) || ('Post for "'+name+'".');
 }
 
 /* ====================== HELPERS ====================== */
@@ -295,14 +309,16 @@ function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,
 function postFromDb(x){return {id:x.id,releaseId:x.release_id,title:x.title,stage:x.stage,platform:x.platform,date:x.post_date,status:x.status,cta:x.cta,caption:x.caption,assetLink:x.asset_link||"",results:x.results||"",assetReady:!!x.asset_ready,captionReady:!!x.caption_ready,winner:!!x.winner};}
 
 /* ====================== STATE ====================== */
+function cloneStages(arr){ return arr.map(function(s){return {id:s.id,label:s.label,offset:s.offset};}); }
 var S = {
   view:"loading", user:null, authMode:"signin", authMsg:"",
-  releases:[], posts:[],
+  releases:[], posts:[], stages:cloneStages(DEFAULT_STAGES),
   tab:"today", openRelease:null, relView:"calendar",
   cal:(function(){var d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
-  qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:""
+  qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null
 };
-var planSel = {platforms:["OnlyFans"], stages:STAGES.map(function(s){return s.id;})};
+var planSel = {platforms:["OnlyFans"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
+function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); }
 function flash(m){ S.toast=m; render(); clearTimeout(flash._t); flash._t=setTimeout(function(){S.toast="";render();},3200); }
 function ask(message,onYes,label){ S.confirm={message:message,onYes:onYes,label:label||"Confirm"}; render(); }
 function sbErr(e){ if(e){ flash("Sync issue: "+(e.message||e)); } }
@@ -323,13 +339,29 @@ function loadAndShow(){
 }
 function fetchAll(){
   if(!sb){return;}
-  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*") ]).then(function(r){
-    var rel=r[0], pos=r[1];
+  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*") ]).then(function(r){
+    var rel=r[0], pos=r[1], setres=r[2];
     if(rel.error||pos.error){ sbErr(rel.error||pos.error); return; }
     S.releases=(rel.data||[]).map(relFromDb);
     S.posts=(pos.data||[]).map(postFromDb);
+    // campaign template
+    if(setres && !setres.error && setres.data && setres.data[0] && Array.isArray(setres.data[0].stages) && setres.data[0].stages.length){
+      S.stages = setres.data[0].stages.map(function(s){return {id:s.id||uid(),label:s.label,offset:Number(s.offset)||0};});
+    } else if(!setres || !setres.error) {
+      // no template saved yet -> seed defaults to the cloud
+      S.stages = cloneStages(DEFAULT_STAGES);
+      saveTemplate(true);
+    }
+    resetPlanStages();
     render();
   }).catch(function(e){ sbErr(e); });
+}
+function saveTemplate(silent){
+  if(!sb || !S.user){ return; }
+  sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){
+    if(r.error){ if(!silent) sbErr(r.error); }
+    else if(!silent){ /* saved */ }
+  });
 }
 function doAuth(){
   var email=($("au_email").value||"").trim(), pass=$("au_pass").value||"";
@@ -369,19 +401,19 @@ function releaseProgress(rid){
   var done=rp.filter(function(p){return ["Scheduled","Posted","Reviewed"].indexOf(p.status)>=0;}).length;
   return done/rp.length*100;
 }
-function generate(name,date,platforms,stages){
+function generate(name,date,platforms,stageIds){
   var rid=uid();
   var rel={id:rid,name:name,date:date,platforms:platforms,createdAt:Date.now()};
+  var chosen = S.stages.filter(function(s){return stageIds.indexOf(s.id)>=0;});
   var newPosts=[];
-  platforms.forEach(function(pl){ stages.forEach(function(stId){
-    var st=STAGE_BY[stId];
-    newPosts.push({id:uid(),releaseId:rid,title:name+" — "+st.label,stage:st.id,platform:pl,
-      date:addDays(date,st.offset),status:st.id==="Release"?"Draft":"Idea",cta:STAGE_CTA[st.id]||"Subscribe",
-      caption:captionScaffold(name,st.id,pl),assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
+  platforms.forEach(function(pl){ chosen.forEach(function(st){
+    newPosts.push({id:uid(),releaseId:rid,title:name+" — "+st.label,stage:st.label,platform:pl,
+      date:addDays(date,st.offset),status:st.offset===0?"Draft":"Idea",cta:defaultCTA(st.offset),
+      caption:captionScaffold(name,st.offset,pl),assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
   });});
   S.releases.push(rel);
   S.posts=S.posts.concat(newPosts);
-  var n=platforms.length*stages.length;
+  var n=newPosts.length;
   S.tab="releases"; S.openRelease=rid;
   flash("Generated "+n+" posts across "+platforms.length+" platform"+(platforms.length>1?"s":"")+".");
   if(sb){
@@ -484,12 +516,19 @@ function releaseDetail(){
   var r=S.releases.filter(function(x){return x.id===S.openRelease;})[0];
   if(!r)return "";
   var rp=S.posts.filter(function(p){return p.releaseId===r.id;});
+  var gmap={}, gorder=[];
+  rp.forEach(function(p){ if(!gmap[p.stage]){gmap[p.stage]=[];gorder.push(p.stage);} gmap[p.stage].push(p); });
+  gorder.sort(function(a,b){
+    var ma=gmap[a].map(function(p){return p.date;}).sort()[0]||"";
+    var mb=gmap[b].map(function(p){return p.date;}).sort()[0]||"";
+    return ma.localeCompare(mb);
+  });
   var groups="";
-  STAGES.forEach(function(s){
-    var items=rp.filter(function(p){return p.stage===s.id;}).sort(function(a,b){return a.platform.localeCompare(b.platform);});
-    if(!items.length)return;
+  gorder.forEach(function(stLabel){
+    var items=gmap[stLabel].slice().sort(function(a,b){return a.platform.localeCompare(b.platform);});
+    var offset=Math.round((new Date(items[0].date+"T00:00:00")-new Date(r.date+"T00:00:00"))/86400000);
     var cards=""; items.forEach(function(p){cards+=postCard(p);});
-    groups+='<div class="cc-stage-group"><div class="cc-stage-label"><span class="cc-stage">'+s.label+'</span><em>'+s.blurb+'</em></div>'+cards+'</div>';
+    groups+='<div class="cc-stage-group"><div class="cc-stage-label"><span class="cc-stage">'+esc(stLabel)+'</span><em>'+esc(stageTiming(offset))+'</em></div>'+cards+'</div>';
   });
   return '<section class="cc-section">'
     +'<button class="cc-back" data-action="back">'+ic("chevR")+' All releases</button>'
@@ -503,13 +542,13 @@ function releaseDetail(){
 
 function planView(){
   var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(planSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="pill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
-  var stages=""; STAGES.forEach(function(s){stages+='<button class="cc-pill'+(planSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="pill-stage" data-v="'+s.id+'">'+esc(s.label)+'</button>';});
+  var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(planSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="pill-stage" data-v="'+s.id+'">'+esc(s.label)+'</button>';});
   return '<section class="cc-section"><h2 class="cc-h2">Plan a Release</h2>'
-    +'<p class="cc-sub">Enter a name + date. Every selected stage is auto-scheduled and back-dated from release day, with a platform-specific caption ready to edit.</p>'
+    +'<p class="cc-sub">Enter a name + date. Every selected stage is auto-scheduled around release day with a platform-specific caption ready to edit.</p>'
     +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" placeholder="e.g. Spring photoset"></label>'
     +'<label class="cc-field"><span>Release date</span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
     +'<div class="cc-field"><span>Platforms</span><div class="cc-wrap">'+plats+'</div></div>'
-    +'<div class="cc-field"><span>Stages</span><div class="cc-wrap">'+stages+'</div></div>'
+    +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
     +'<button class="cc-primary" data-action="generate">'+ic("sparkles")+' Generate schedule</button>'
     +'<button class="cc-ghost full" data-action="seed" style="margin-top:10px">Load example release</button>'
     +'</section>';
@@ -530,15 +569,53 @@ function moreView(){
   var needsHTML=""; if(needs.length){needs.slice(0,6).forEach(function(p){needsHTML+=postCard(p);});}else{needsHTML=empty("alert","Everything's prepped.");}
   var winHTML=""; if(winners.length){winners.forEach(function(p){winHTML+=postCard(p);});}else{winHTML=empty("star","Mark a post as a winner to reuse it later.");}
   var email = S.user && S.user.email ? S.user.email : "Signed in";
-  return '<section class="cc-section"><h2 class="cc-h2">More</h2><p class="cc-sub">Account, triage lists and backups.</p>'
+  var tplRows=""; S.stages.forEach(function(s){ tplRows+='<div class="cc-tpl-line"><span class="cc-stage">'+esc(s.label)+'</span><em>'+esc(stageTiming(s.offset))+'</em></div>'; });
+  return '<section class="cc-section"><h2 class="cc-h2">More</h2><p class="cc-sub">Account, campaign template, triage and backups.</p>'
     +'<div class="cc-account"><div style="flex:1;min-width:0"><div class="em">'+esc(email)+'</div><div class="sync">● Synced to the cloud</div></div>'
       +'<button class="cc-ghost" data-action="signout">'+ic("logout")+' Sign out</button></div>'
+    +'<h3 class="cc-sub-h">My Campaign Template</h3>'
+    +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release. Edit them to match how you run a drip — rename, change timing, add or remove steps.</p>'
+    +'<div class="cc-tpl-box">'+tplRows+'</div>'
+    +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-tpl">'+ic("sparkles")+' Edit campaign template</button>'
     +'<h3 class="cc-sub-h">Needs Work ('+needs.length+')</h3>'+needsHTML
     +'<h3 class="cc-sub-h">Winners ('+winners.length+')</h3>'+winHTML
     +'<h3 class="cc-sub-h">Backups</h3>'
     +'<div class="cc-data-row"><button class="cc-ghost" data-action="export">'+ic("download")+' Export</button><button class="cc-ghost" data-action="import">'+ic("upload")+' Import</button></div>'
     +'<button class="cc-ghost danger full" style="margin-top:10px" data-action="clear">'+ic("trash")+' Clear all</button>'
     +'<p class="cc-note">Your data lives in your private cloud database and syncs to every device you sign in on. Export is just an extra offline copy.</p></section>';
+}
+
+function tplEditorModal(){
+  if(!S.tplEdit)return"";
+  var rows="";
+  S.tplEdit.forEach(function(s,i){
+    var dir = s.offset<0?"before":(s.offset>0?"after":"release");
+    var num = Math.abs(s.offset)||0;
+    rows+='<div class="cc-tpl-row">'
+      +'<input id="tpl_label_'+i+'" class="cc-input" value="'+esc(s.label)+'" placeholder="Stage name (e.g. D7, Teaser)">'
+      +'<div class="cc-tpl-when">'
+        +'<input id="tpl_num_'+i+'" class="cc-input cc-num" type="number" min="0" value="'+num+'"'+(dir==="release"?' disabled':'')+'>'
+        +'<select id="tpl_dir_'+i+'" class="cc-input" data-action="tpl-dir" data-i="'+i+'">'
+          +'<option value="before"'+(dir==="before"?" selected":"")+'>days before</option>'
+          +'<option value="release"'+(dir==="release"?" selected":"")+'>release day</option>'
+          +'<option value="after"'+(dir==="after"?" selected":"")+'>days after</option>'
+        +'</select>'
+      +'</div>'
+      +'<div class="cc-tpl-rowbtns">'
+        +'<button class="cc-icon-btn" data-action="tpl-up" data-i="'+i+'" '+(i===0?'disabled':'')+'>'+ic("chevL")+'</button>'
+        +'<button class="cc-icon-btn" data-action="tpl-down" data-i="'+i+'" '+(i===S.tplEdit.length-1?'disabled':'')+'>'+ic("chevR")+'</button>'
+        +'<button class="cc-icon-btn danger" data-action="tpl-remove" data-i="'+i+'">'+ic("trash",16)+'</button>'
+      +'</div>'
+    +'</div>';
+  });
+  return '<div class="cc-modal-bg" data-action="close-tpl"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Campaign Template</h2><button class="cc-icon-btn" data-action="close-tpl">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Each stage becomes one post per platform when you generate a release. Timing is relative to your release day.</p>'
+    +rows
+    +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
+    +'<button class="cc-ghost full" data-action="tpl-reset" style="margin-bottom:14px">Reset to default (D7 · D3 · D1 · Release · Follow-Up)</button>'
+    +'<button class="cc-primary" data-action="tpl-save">'+ic("check",16)+' Save template</button>'
+    +'</div></div>';
 }
 
 function editorModal(){
@@ -633,6 +710,7 @@ function render(){
     +'<nav class="cc-nav">'+nav+'</nav>'
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
+    +tplEditorModal()
     +confirmModal();
   $("app").innerHTML=html;
 }
@@ -667,17 +745,31 @@ document.addEventListener("click",function(e){
     if(!date){flash("Pick a release date.");return;}
     if(!planSel.platforms.length){flash("Select at least one platform.");return;}
     if(!planSel.stages.length){flash("Select at least one stage.");return;}
-    var ordered=STAGES.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
+    var ordered=S.stages.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     generate(name,date,planSel.platforms.slice(),ordered);
-    planSel={platforms:["OnlyFans"],stages:STAGES.map(function(s){return s.id;})};
+    planSel={platforms:["OnlyFans"],stages:S.stages.map(function(s){return s.id;})};
     return;
   }
-  if(a==="seed"){ generate("Sample Drop",addDays(todayStr(),14),["OnlyFans","X","Reddit"],["D7","D3","D1","Release","Follow-Up"]); return; }
+  if(a==="seed"){ generate("Sample Drop",addDays(todayStr(),14),["OnlyFans","X","Reddit"],S.stages.map(function(s){return s.id;})); return; }
   if(a==="save-post"){ savePostFromForm(); return; }
   if(a==="del-post"){ ask("Delete this post?",function(){deletePost(id);},"Delete"); return; }
   if(a==="del-rel"){ var rid=id; ask("Delete this release and all of its posts? This can't be undone.",function(){deleteRelease(rid);},"Delete release"); return; }
   if(a==="close-modal"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.editing=null; render(); return; }
   if(a==="chk"){ el.classList.toggle("on"); var on=el.classList.contains("on"); var lbl=el.id==="f_winner"?" Winner":(el.id==="f_assetReady"?" Asset ready":" Caption ready"); el.innerHTML=(on?(el.id==="f_winner"?ic("star",13):ic("check",13)):"")+lbl; return; }
+  if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
+  if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; render(); return; }
+  if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2}); render(); return; }
+  if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
+  if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} render(); return; }
+  if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} render(); return; }
+  if(a==="tpl-reset"){ S.tplEdit=cloneStages(DEFAULT_STAGES); render(); return; }
+  if(a==="tpl-save"){
+    syncTplFromDOM();
+    var clean=S.tplEdit.filter(function(s){return (s.label||"").trim();});
+    if(!clean.length){ flash("Add at least one stage."); return; }
+    clean.forEach(function(s){ s.label=s.label.trim(); if(!s.id)s.id=uid(); });
+    S.stages=clean; S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
+  }
   if(a==="export"){ exportJSON(); return; }
   if(a==="import"){ $("importFile").click(); return; }
   if(a==="clear"){ ask("Clear ALL releases and posts from the cloud? This can't be undone.",function(){clearAll();},"Clear all"); return; }
@@ -685,11 +777,21 @@ document.addEventListener("click",function(e){
   if(a==="confirm-yes"){ var fn=S.confirm&&S.confirm.onYes; S.confirm=null; render(); if(fn)fn(); return; }
 });
 
+function syncTplFromDOM(){
+  if(!S.tplEdit)return;
+  S.tplEdit.forEach(function(s,i){
+    var le=$("tpl_label_"+i), ne=$("tpl_num_"+i), de=$("tpl_dir_"+i);
+    if(le)s.label=le.value;
+    if(de){ var dir=de.value; var num=ne?(parseInt(ne.value,10)||0):0; s.offset = dir==="before"?-num:(dir==="after"?num:0); }
+  });
+}
+
 document.addEventListener("change",function(e){
   var el=e.target.closest("[data-action]"); if(!el)return;
   var a=el.getAttribute("data-action");
   if(a==="filter-plat"){ S.qPlat=el.value; render(); }
   else if(a==="filter-status"){ S.qStatus=el.value; render(); }
+  else if(a==="tpl-dir"){ syncTplFromDOM(); render(); }
 });
 
 $("importFile").addEventListener("change",function(e){
