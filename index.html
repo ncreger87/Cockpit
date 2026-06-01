@@ -185,6 +185,9 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-tpl-when{display:flex;gap:8px;}
 .cc-tpl-when .cc-num{max-width:90px;}
 .cc-tpl-rowbtns{display:flex;gap:8px;justify-content:flex-end;}
+.cc-pill.sm{font-size:11.5px;padding:5px 10px;}
+.cc-tpl-platlabel{font-size:11.5px;color:var(--mut);font-weight:500;margin-top:2px;}
+.cc-tpl-platnote{font-size:11.5px;color:var(--mut2);margin-top:3px;}
 
 .cc-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch;}
 .cc-chips::-webkit-scrollbar{display:none;}
@@ -196,7 +199,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 
 .cc-intro-bg{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:24px;
   background:radial-gradient(120% 80% at 50% 0%, #2a1e2e 0%, #0d0c10 60%);}
-.cc-intro{position:relative;width:100%;max-width:400px;background:var(--bg2);border:1px solid var(--line2);
+.cc-intro{position:relative;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);
   border-radius:22px;padding:30px 24px 24px;text-align:center;animation:introIn .35s cubic-bezier(.2,.8,.2,1);
   box-shadow:0 30px 80px rgba(0,0,0,.55);}
 @keyframes introIn{from{opacity:0;transform:translateY(16px) scale(.97);}to{opacity:1;transform:none;}}
@@ -211,6 +214,13 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-idots{display:flex;gap:7px;justify-content:center;margin-bottom:20px;}
 .cc-idot{width:7px;height:7px;border-radius:50%;background:var(--line2);transition:.2s;}
 .cc-idot.on{background:var(--accent);width:22px;border-radius:4px;}
+.cc-wiz-toggle{display:flex;gap:8px;margin-bottom:6px;}
+.cc-wiz-yn{flex:1;background:var(--card);border:1px solid var(--line2);color:var(--mut);font-family:inherit;font-size:13.5px;padding:11px;border-radius:11px;cursor:pointer;transition:.15s;}
+.cc-wiz-yn.on{background:var(--accent);color:#1a120a;border-color:var(--accent);font-weight:600;}
+.cc-wiz-sec{margin-top:14px;text-align:left;}
+.cc-wiz-lbl{font-size:12px;color:var(--mut);font-weight:500;margin-bottom:8px;}
+.cc-wiz-nav{display:flex;gap:10px;margin-top:4px;}
+.cc-intro .cc-wrap{justify-content:flex-start;}
 
 .cc-confirm-bg{position:fixed;inset:0;background:rgba(6,5,9,.66);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;}
 .cc-confirm{background:var(--bg2);border:1px solid var(--line2);border-radius:18px;max-width:360px;width:100%;padding:22px;animation:fade .2s ease;}
@@ -268,12 +278,13 @@ var PLATFORMS = [
   {id:"Reddit",group:"reddit"},{id:"Instagram",group:"social"},{id:"TikTok",group:"social"}
 ];
 var PG = {}; PLATFORMS.forEach(function(p){PG[p.id]=p.group;});
+var ALL_PLAT = PLATFORMS.map(function(p){return p.id;});
 var DEFAULT_STAGES = [
-  {id:"d7",label:"D7",offset:-7},
-  {id:"d3",label:"D3",offset:-3},
-  {id:"d1",label:"D1",offset:-1},
-  {id:"release",label:"Release",offset:0},
-  {id:"followup",label:"Follow-Up",offset:3}
+  {id:"d7",label:"D7",offset:-7,platforms:["X","Bluesky"]},
+  {id:"d3",label:"D3",offset:-3,platforms:["X","Bluesky"]},
+  {id:"d1",label:"D1",offset:-1,platforms:["X","Bluesky"]},
+  {id:"release",label:"Release",offset:0,platforms:ALL_PLAT.slice()},
+  {id:"followup",label:"Follow-Up",offset:3,platforms:ALL_PLAT.slice()}
 ];
 var STATUS_ORDER = ["Idea","Draft","Ready","Scheduled","Posted","Reviewed"];
 var STATUS_COLOR = {Idea:"#8A8A99",Draft:"#E0A23C",Ready:"#3FB68B",Scheduled:"#5B8DEF",Posted:"#9B7BE8",Reviewed:"#6B6B78"};
@@ -335,14 +346,15 @@ function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,
 function postFromDb(x){return {id:x.id,releaseId:x.release_id,title:x.title,stage:x.stage,platform:x.platform,date:x.post_date,status:x.status,cta:x.cta,caption:x.caption,assetLink:x.asset_link||"",results:x.results||"",assetReady:!!x.asset_ready,captionReady:!!x.caption_ready,winner:!!x.winner};}
 
 /* ====================== STATE ====================== */
-function cloneStages(arr){ return arr.map(function(s){return {id:s.id,label:s.label,offset:s.offset};}); }
+function cloneStages(arr){ return arr.map(function(s){return {id:s.id,label:s.label,offset:s.offset,platforms:(s.platforms||ALL_PLAT).slice()};}); }
 var S = {
   view:"loading", user:null, authMode:"signin", authMsg:"",
   releases:[], posts:[], stages:cloneStages(DEFAULT_STAGES),
   tab:"today", openRelease:null, relView:"calendar",
   cal:(function(){var d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
   qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null,
-  onboarded:true, intro:0, calFilter:"releases", dateEdit:null
+  onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
+  wiz:null, wizOpen:false
 };
 var planSel = {platforms:["OnlyFans"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); }
@@ -374,7 +386,7 @@ function fetchAll(){
     // campaign template + onboarding flag
     var srow = (setres && !setres.error && setres.data && setres.data[0]) ? setres.data[0] : null;
     if(srow && Array.isArray(srow.stages) && srow.stages.length){
-      S.stages = srow.stages.map(function(s){return {id:s.id||uid(),label:s.label,offset:Number(s.offset)||0};});
+      S.stages = srow.stages.map(function(s){return {id:s.id||uid(),label:s.label,offset:Number(s.offset)||0,platforms:Array.isArray(s.platforms)?s.platforms.slice():ALL_PLAT.slice()};});
     } else if(!setres || !setres.error) {
       // no template saved yet -> seed defaults to the cloud
       S.stages = cloneStages(DEFAULT_STAGES);
@@ -382,7 +394,7 @@ function fetchAll(){
     }
     // show intro the first time (onboarded flag absent/false)
     if(srow && srow.onboarded){ S.onboarded=true; }
-    else { S.onboarded=false; S.intro=0; }
+    else { S.onboarded=false; S.wizOpen=true; }
     resetPlanStages();
     render();
   }).catch(function(e){ sbErr(e); });
@@ -392,10 +404,6 @@ function saveTemplate(silent){
   sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, onboarded:S.onboarded, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){
     if(r.error){ if(!silent) sbErr(r.error); }
   });
-}
-function finishIntro(){
-  S.onboarded=true; S.intro=0; render();
-  if(sb && S.user){ sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, onboarded:true, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){ if(r.error)sbErr(r.error); }); }
 }
 function doAuth(){
   var email=($("au_email").value||"").trim(), pass=$("au_pass").value||"";
@@ -458,19 +466,26 @@ function releaseProgress(rid){
 }
 function generate(name,date,platforms,stageIds){
   var rid=uid();
-  var rel={id:rid,name:name,date:date,platforms:platforms,createdAt:Date.now()};
   var chosen = S.stages.filter(function(s){return stageIds.indexOf(s.id)>=0;});
   var newPosts=[];
-  platforms.forEach(function(pl){ chosen.forEach(function(st){
-    newPosts.push({id:uid(),releaseId:rid,title:name+" — "+st.label,stage:st.label,platform:pl,
-      date:addDays(date,st.offset),status:st.offset===0?"Draft":"Idea",cta:defaultCTA(st.offset),
-      caption:captionScaffold(name,st.offset,pl),assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
-  });});
+  var usedPlats={};
+  chosen.forEach(function(st){
+    var stPlats=(st.platforms||ALL_PLAT).filter(function(pl){return platforms.indexOf(pl)>=0;});
+    stPlats.forEach(function(pl){
+      usedPlats[pl]=true;
+      newPosts.push({id:uid(),releaseId:rid,title:name+" — "+st.label,stage:st.label,platform:pl,
+        date:addDays(date,st.offset),status:st.offset===0?"Draft":"Idea",cta:defaultCTA(st.offset),
+        caption:captionScaffold(name,st.offset,pl),assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
+    });
+  });
+  if(!newPosts.length){ flash("No posts to create — none of the chosen stages post to the platforms you picked. Adjust platforms or your template."); return; }
+  var relPlats=Object.keys(usedPlats);
+  var rel={id:rid,name:name,date:date,platforms:relPlats,createdAt:Date.now()};
   S.releases.push(rel);
   S.posts=S.posts.concat(newPosts);
   var n=newPosts.length;
   S.tab="releases"; S.openRelease=rid;
-  flash("Generated "+n+" posts across "+platforms.length+" platform"+(platforms.length>1?"s":"")+".");
+  flash("Generated "+n+" post"+(n>1?"s":"")+" across "+relPlats.length+" platform"+(relPlats.length>1?"s":"")+".");
   if(sb){
     sb.from("releases").insert(relToDb(rel)).then(function(r){
       if(r.error){ sbErr(r.error); return; }
@@ -638,7 +653,7 @@ function planView(){
     +'<p class="cc-sub">Enter a name + date. Every selected stage is auto-scheduled around release day with a platform-specific caption ready to edit.</p>'
     +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" placeholder="e.g. Spring photoset"></label>'
     +'<label class="cc-field"><span>Release date</span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
-    +'<div class="cc-field"><span>Platforms</span><div class="cc-wrap">'+plats+'</div></div>'
+    +'<div class="cc-field"><span>Platforms <span style="color:var(--mut2);font-weight:400">— narrows this drop</span></span><div class="cc-wrap">'+plats+'</div></div>'
     +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
     +'<button class="cc-primary" data-action="generate">'+ic("sparkles")+' Generate schedule</button>'
     +'<button class="cc-ghost full" data-action="seed" style="margin-top:10px">Load example release</button>'
@@ -660,13 +675,14 @@ function moreView(){
   var needsHTML=""; if(needs.length){needs.slice(0,6).forEach(function(p){needsHTML+=postCard(p);});}else{needsHTML=empty("alert","Everything's prepped.");}
   var winHTML=""; if(winners.length){winners.forEach(function(p){winHTML+=postCard(p);});}else{winHTML=empty("star","Mark a post as a winner to reuse it later.");}
   var email = S.user && S.user.email ? S.user.email : "Signed in";
-  var tplRows=""; S.stages.forEach(function(s){ tplRows+='<div class="cc-tpl-line"><span class="cc-stage">'+esc(s.label)+'</span><em>'+esc(stageTiming(s.offset))+'</em></div>'; });
+  var tplRows=""; S.stages.forEach(function(s){ var pl=(s.platforms||[]).join(", ")||"no platforms"; tplRows+='<div class="cc-tpl-line"><div style="flex:1;min-width:0"><span class="cc-stage">'+esc(s.label)+'</span> <em>'+esc(stageTiming(s.offset))+'</em><div class="cc-tpl-platnote">'+esc(pl)+'</div></div></div>'; });
   return '<section class="cc-section"><h2 class="cc-h2">More</h2><p class="cc-sub">Account, campaign template, triage and backups.</p>'
     +'<div class="cc-account"><div style="flex:1;min-width:0"><div class="em">'+esc(email)+'</div><div class="sync">● Synced to the cloud</div></div>'
       +'<button class="cc-ghost" data-action="signout">'+ic("logout")+' Sign out</button></div>'
     +'<h3 class="cc-sub-h">My Campaign Template</h3>'
     +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release. Edit them to match how you run a drip — rename, change timing, add or remove steps.</p>'
     +'<div class="cc-tpl-box">'+tplRows+'</div>'
+    +'<button class="cc-primary" style="margin-top:12px" data-action="launch-wizard">'+ic("rocket",16)+' Set up my campaign (guided)</button>'
     +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-tpl">'+ic("sparkles")+' Edit campaign template</button>'
     +'<h3 class="cc-sub-h">Needs Work ('+needs.length+')</h3>'+needsHTML
     +'<h3 class="cc-sub-h">Winners ('+winners.length+')</h3>'+winHTML
@@ -682,6 +698,8 @@ function tplEditorModal(){
   S.tplEdit.forEach(function(s,i){
     var dir = s.offset<0?"before":(s.offset>0?"after":"release");
     var num = Math.abs(s.offset)||0;
+    var sp = s.platforms||[];
+    var platChips=""; PLATFORMS.forEach(function(p){ platChips+='<button class="cc-pill sm'+(sp.indexOf(p.id)>=0?" on":"")+'" data-action="tpl-plat" data-i="'+i+'" data-v="'+p.id+'">'+esc(p.id)+'</button>'; });
     rows+='<div class="cc-tpl-row">'
       +'<input id="tpl_label_'+i+'" class="cc-input" value="'+esc(s.label)+'" placeholder="Stage name (e.g. D7, Teaser)">'
       +'<div class="cc-tpl-when">'
@@ -692,6 +710,8 @@ function tplEditorModal(){
           +'<option value="after"'+(dir==="after"?" selected":"")+'>days after</option>'
         +'</select>'
       +'</div>'
+      +'<div class="cc-tpl-platlabel">Posts to'+(sp.length?"":' <span style="color:var(--bad)">— none selected</span>')+'</div>'
+      +'<div class="cc-wrap">'+platChips+'</div>'
       +'<div class="cc-tpl-rowbtns">'
         +'<button class="cc-icon-btn" data-action="tpl-up" data-i="'+i+'" '+(i===0?'disabled':'')+'>'+ic("chevL")+'</button>'
         +'<button class="cc-icon-btn" data-action="tpl-down" data-i="'+i+'" '+(i===S.tplEdit.length-1?'disabled':'')+'>'+ic("chevR")+'</button>'
@@ -701,7 +721,7 @@ function tplEditorModal(){
   });
   return '<div class="cc-modal-bg" data-action="close-tpl"><div class="cc-modal" data-stop="1">'
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Campaign Template</h2><button class="cc-icon-btn" data-action="close-tpl">'+ic("x")+'</button></div>'
-    +'<p class="cc-note" style="margin:0 0 14px">Each stage becomes one post per platform when you generate a release. Timing is relative to your release day.</p>'
+    +'<p class="cc-note" style="margin:0 0 14px">Each stage posts only to the platforms you pick for it. When you plan a release, the platform buttons there narrow this further for that one drop.</p>'
     +rows
     +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
     +'<button class="cc-ghost full" data-action="tpl-reset" style="margin-bottom:14px">Reset to default (D7 · D3 · D1 · Release · Follow-Up)</button>'
@@ -757,28 +777,138 @@ function dateEditModal(){
     +'</div></div>';
 }
 
-function introOverlay(){
-  if(S.onboarded || S.view!=="app")return"";
-  var cards=[
-    {tag:"Welcome, tester",icon:"rocket",title:"You're an early tester",body:"Thanks for trying Creator Cockpit. This is a work-in-progress preview — some edges are rough, and that's exactly what you're here to help me find. Nothing you do can break it permanently."},
-    {tag:"Step 1",icon:"sparkles",title:"Plan a release",body:"Tap <b>Plan</b>, give your drop a name and date, pick your platforms, and hit Generate. The app instantly builds every post in your campaign, dated and captioned for you."},
-    {tag:"Step 2",icon:"layers",title:"See it on the calendar",body:"Under <b>Releases</b>, the calendar shows your drops. Use the filter chips to switch between releases, all posts, or a single platform. Tap any day to jump in."},
-    {tag:"Step 3",icon:"more",title:"Make the campaign yours",body:"In <b>More → Edit campaign template</b>, rename the stages, change their timing, or add and remove steps so the app matches how <i>you</i> run a drip. This is the newest part — push on it."},
-    {tag:"You're set",icon:"check",title:"Go break things",body:"Run a real release through it, then tell me anything confusing, missing, or clunky. Your data saves privately to the cloud and syncs across your devices."}
+/* ====================== SETUP WIZARD ====================== */
+var TIMING_PRESETS = [
+  {key:"4wk",label:"4 weeks before",offset:-28},
+  {key:"3wk",label:"3 weeks before",offset:-21},
+  {key:"2wk",label:"2 weeks before",offset:-14},
+  {key:"1wk",label:"1 week before",offset:-7},
+  {key:"3d",label:"3 days before",offset:-3},
+  {key:"1d",label:"1 day before",offset:-1},
+  {key:"day",label:"Release day",offset:0},
+  {key:"after",label:"Day after",offset:3}
+];
+var PAID_PLATS = PLATFORMS.filter(function(p){return p.group==="paid";}).map(function(p){return p.id;});
+var SOCIAL_PLATS = ["X","Bluesky"];
+
+// Each post type the wizard asks about. defaults reflect the user's real workflow.
+function wizPostTypes(){
+  return [
+    {key:"teaser", title:"Teaser posts", q:"Do you post teasers building up to a drop?",
+      hint:"Short hype posts leading up to release day.", defaultPlats:SOCIAL_PLATS.slice(),
+      defaultTimes:["1wk","3d","1d"], labelFor:function(t){return "Teaser ("+t.label.replace(" before","")+")";}},
+    {key:"presale", title:"Pre-sale push", q:"Do you run pre-sales before a drop?",
+      hint:"Pre-sale offers — usually on your paid sites, via posts or DMs.", defaultPlats:PAID_PLATS.slice(),
+      defaultTimes:["2wk","1wk"], presale:true, labelFor:function(t){return "Pre-sale ("+t.label.replace(" before","")+")";}},
+    {key:"release", title:"Release day", q:"Post everywhere on release day?",
+      hint:"The main 'it's live' post.", defaultPlats:ALL_PLAT.slice(),
+      defaultTimes:["day"], fixedTimes:["day"], labelFor:function(){return "Release";}},
+    {key:"followup", title:"Follow-up bump", q:"Do you post a follow-up after release?",
+      hint:"An 'in case you missed it' reminder a few days later.", defaultPlats:ALL_PLAT.slice(),
+      defaultTimes:["after"], labelFor:function(){return "Follow-Up";}}
   ];
-  var c=cards[Math.min(S.intro,cards.length-1)];
-  var dots=""; cards.forEach(function(_,i){ dots+='<span class="cc-idot'+(i===S.intro?" on":"")+'"></span>'; });
-  var last = S.intro>=cards.length-1;
-  return '<div class="cc-intro-bg"><div class="cc-intro">'
-    +'<button class="cc-intro-skip" data-action="intro-skip">Skip</button>'
-    +'<div class="cc-intro-icon">'+ic(c.icon,26)+'</div>'
-    +'<div class="cc-intro-tag">'+esc(c.tag)+'</div>'
-    +'<h2 class="cc-intro-title">'+c.title+'</h2>'
-    +'<p class="cc-intro-body">'+c.body+'</p>'
-    +'<div class="cc-idots">'+dots+'</div>'
-    +'<button class="cc-primary" data-action="'+(last?"intro-done":"intro-next")+'">'+(last?"Enter the app":"Next")+'</button>'
-    +'</div></div>';
 }
+
+function initWizard(){
+  var types=wizPostTypes();
+  var answers={};
+  types.forEach(function(t){ answers[t.key]={on:t.key==="release"?true:(t.key==="teaser"||t.key==="presale"||t.key==="followup"), times:t.defaultTimes.slice(), platforms:t.defaultPlats.slice()}; });
+  S.wiz={ step:0, types:types, answers:answers };
+}
+
+function wizardBuildStages(){
+  var out=[];
+  S.wiz.types.forEach(function(t){
+    var a=S.wiz.answers[t.key];
+    if(!a.on) return;
+    if(!a.platforms.length) return;
+    var times = t.fixedTimes ? t.fixedTimes : a.times;
+    times.forEach(function(tk){
+      var pre=TIMING_PRESETS.filter(function(p){return p.key===tk;})[0]; if(!pre)return;
+      out.push({ id:uid(), label:t.labelFor(pre), offset:pre.offset, platforms:a.platforms.slice(), presale:!!t.presale });
+    });
+  });
+  // sort by offset (earliest first)
+  out.sort(function(a,b){return a.offset-b.offset;});
+  return out;
+}
+
+function finishWizard(){
+  var stages=wizardBuildStages();
+  if(!stages.length){ stages=cloneStages(DEFAULT_STAGES); }
+  S.stages=stages; resetPlanStages();
+  S.wiz=null; S.wizOpen=false; S.onboarded=true; render();
+  if(sb && S.user){ sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, onboarded:true, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){ if(r.error)sbErr(r.error); }); }
+  flash("Your campaign template is ready — edit it anytime under More.");
+}
+
+function wizardOverlay(){
+  if(!S.wizOpen || S.view!=="app")return"";
+  if(!S.wiz) initWizard();
+  var w=S.wiz;
+  // total screens: welcome(0) + one per type + review
+  var typeCount=w.types.length;
+  var totalSteps = 1 + typeCount + 1;
+  var dots=""; for(var di=0;di<totalSteps;di++){ dots+='<span class="cc-idot'+(di===w.step?" on":"")+'"></span>'; }
+
+  var inner="";
+  if(w.step===0){
+    inner='<button class="cc-intro-skip" data-action="wiz-skip">Skip</button>'
+      +'<div class="cc-intro-icon">'+ic("rocket",26)+'</div>'
+      +'<div class="cc-intro-tag">Welcome, tester</div>'
+      +'<h2 class="cc-intro-title">Let\'s set up your campaign</h2>'
+      +'<p class="cc-intro-body">You\'re an early tester — thanks for trying this out. It\'s a work in progress, so tell me what\'s rough. First, a few quick questions to build your posting template. You can change all of it later.</p>'
+      +'<div class="cc-idots">'+dots+'</div>'
+      +'<button class="cc-primary" data-action="wiz-next">Get started</button>';
+  } else if(w.step>=1 && w.step<=typeCount){
+    var t=w.types[w.step-1]; var a=w.answers[t.key];
+    var timeChips="";
+    if(!t.fixedTimes){
+      TIMING_PRESETS.forEach(function(p){
+        if(t.key==="followup" && p.offset<0) return; // follow-up only makes sense at/after release
+        if((t.key==="teaser"||t.key==="presale") && p.offset>0) return; // build-up posts are before
+        timeChips+='<button class="cc-pill sm'+(a.times.indexOf(p.key)>=0?" on":"")+'" data-action="wiz-time" data-k="'+p.key+'">'+esc(p.label)+'</button>';
+      });
+    }
+    var platChips=""; PLATFORMS.forEach(function(p){ platChips+='<button class="cc-pill sm'+(a.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="wiz-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>'; });
+    var body='<div class="cc-wiz-toggle">'
+      +'<button class="cc-wiz-yn'+(a.on?" on":"")+'" data-action="wiz-yes">Yes, I do this</button>'
+      +'<button class="cc-wiz-yn'+(!a.on?" on":"")+'" data-action="wiz-no">No / skip</button>'
+      +'</div>';
+    if(a.on){
+      if(!t.fixedTimes){ body+='<div class="cc-wiz-sec"><div class="cc-wiz-lbl">When? (pick any)</div><div class="cc-wrap">'+timeChips+'</div></div>'; }
+      body+='<div class="cc-wiz-sec"><div class="cc-wiz-lbl">Which platforms?</div><div class="cc-wrap">'+platChips+'</div></div>';
+    }
+    var last = (w.step===typeCount);
+    inner='<button class="cc-intro-skip" data-action="wiz-skip">Skip</button>'
+      +'<div class="cc-intro-tag">Question '+w.step+' of '+typeCount+'</div>'
+      +'<h2 class="cc-intro-title">'+esc(t.title)+'</h2>'
+      +'<p class="cc-intro-body" style="margin-bottom:16px">'+esc(t.q)+' <span style="color:var(--mut2)">'+esc(t.hint)+'</span></p>'
+      +body
+      +'<div class="cc-idots" style="margin-top:18px">'+dots+'</div>'
+      +'<div class="cc-wiz-nav"><button class="cc-ghost" data-action="wiz-back">Back</button>'
+      +'<button class="cc-primary" data-action="wiz-next" style="flex:1">'+(last?"Review":"Next")+'</button></div>';
+  } else {
+    // review
+    var stages=wizardBuildStages();
+    var rows="";
+    if(stages.length){
+      stages.forEach(function(s){ rows+='<div class="cc-tpl-line"><div style="flex:1;min-width:0"><span class="cc-stage">'+esc(s.label)+'</span> <em>'+esc(stageTiming(s.offset))+'</em><div class="cc-tpl-platnote">'+esc((s.platforms||[]).join(", "))+'</div></div></div>'; });
+    } else { rows='<p class="cc-intro-body">No stages yet — that\'s fine, you can build them later. We\'ll start you with the standard template.</p>'; }
+    inner='<button class="cc-intro-skip" data-action="wiz-skip">Skip</button>'
+      +'<div class="cc-intro-icon">'+ic("check",26)+'</div>'
+      +'<div class="cc-intro-tag">Your campaign</div>'
+      +'<h2 class="cc-intro-title">Here\'s your template</h2>'
+      +'<p class="cc-intro-body" style="margin-bottom:14px">Every new release builds these posts automatically. Edit anytime under <b>More → Edit campaign template</b>.</p>'
+      +'<div class="cc-tpl-box" style="text-align:left;margin-bottom:18px">'+rows+'</div>'
+      +'<div class="cc-idots">'+dots+'</div>'
+      +'<div class="cc-wiz-nav"><button class="cc-ghost" data-action="wiz-back">Back</button>'
+      +'<button class="cc-primary" data-action="wiz-done" style="flex:1">'+ic("check",16)+' Start using it</button></div>';
+  }
+  return '<div class="cc-intro-bg"><div class="cc-intro">'+inner+'</div></div>';
+}
+
+function introOverlay(){ return wizardOverlay(); }
 
 function authScreen(){
   var isSignup=S.authMode==="signup";
@@ -891,12 +1021,23 @@ document.addEventListener("click",function(e){
   if(a==="date-shift"){ var nd=$("dt_new").value; if(!nd){flash("Pick a date.");return;} var rid2=id; S.dateEdit=null; changeReleaseDate(rid2,nd,true); return; }
   if(a==="date-only"){ var nd2=$("dt_new").value; if(!nd2){flash("Pick a date.");return;} var rid3=id; S.dateEdit=null; changeReleaseDate(rid3,nd2,false); return; }
   if(a==="calfilter"){ S.calFilter=el.getAttribute("data-v"); render(); return; }
-  if(a==="intro-next"){ S.intro++; render(); return; }
-  if(a==="intro-skip"){ finishIntro(); return; }
-  if(a==="intro-done"){ finishIntro(); return; }
+  if(a==="wiz-next"){ S.wiz.step++; render(); return; }
+  if(a==="wiz-back"){ if(S.wiz.step>0)S.wiz.step--; render(); return; }
+  if(a==="wiz-skip"){
+    S.wiz=null; S.wizOpen=false;
+    if(!S.onboarded){ S.stages=cloneStages(DEFAULT_STAGES); resetPlanStages(); S.onboarded=true; if(sb&&S.user){sb.from("settings").upsert({user_id:S.user.id,stages:S.stages,onboarded:true,updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){if(r.error)sbErr(r.error);});} }
+    render(); return;
+  }
+  if(a==="wiz-done"){ finishWizard(); return; }
+  if(a==="wiz-yes"){ var tt=S.wiz.types[S.wiz.step-1]; S.wiz.answers[tt.key].on=true; render(); return; }
+  if(a==="wiz-no"){ var tt2=S.wiz.types[S.wiz.step-1]; S.wiz.answers[tt2.key].on=false; render(); return; }
+  if(a==="wiz-time"){ var tt3=S.wiz.types[S.wiz.step-1]; var ans=S.wiz.answers[tt3.key]; var tk=el.getAttribute("data-k"); var ix=ans.times.indexOf(tk); if(ix>=0)ans.times.splice(ix,1); else ans.times.push(tk); render(); return; }
+  if(a==="wiz-plat"){ var tt4=S.wiz.types[S.wiz.step-1]; var ans2=S.wiz.answers[tt4.key]; var pv2=el.getAttribute("data-v"); var ix2=ans2.platforms.indexOf(pv2); if(ix2>=0)ans2.platforms.splice(ix2,1); else ans2.platforms.push(pv2); render(); return; }
+  if(a==="launch-wizard"){ ask("Run the guided setup? It rebuilds your campaign template from your answers. Your existing releases and posts stay exactly as they are.",function(){ initWizard(); S.wizOpen=true; render(); },"Run setup"); return; }
   if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
   if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; render(); return; }
-  if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2}); render(); return; }
+  if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); render(); return; }
+  if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } render(); return; }
   if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
   if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} render(); return; }
   if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} render(); return; }
@@ -905,6 +1046,8 @@ document.addEventListener("click",function(e){
     syncTplFromDOM();
     var clean=S.tplEdit.filter(function(s){return (s.label||"").trim();});
     if(!clean.length){ flash("Add at least one stage."); return; }
+    var noPlat=clean.filter(function(s){return !(s.platforms&&s.platforms.length);});
+    if(noPlat.length){ flash('"'+noPlat[0].label.trim()+'" has no platforms selected — pick at least one or remove the stage.'); return; }
     clean.forEach(function(s){ s.label=s.label.trim(); if(!s.id)s.id=uid(); });
     S.stages=clean; S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
