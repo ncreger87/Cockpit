@@ -188,6 +188,13 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-pill.sm{font-size:11.5px;padding:5px 10px;}
 .cc-tpl-platlabel{font-size:11.5px;color:var(--mut);font-weight:500;margin-top:2px;}
 .cc-tpl-platnote{font-size:11.5px;color:var(--mut2);margin-top:3px;}
+.cc-vault-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin-bottom:10px;}
+.cc-vault-main{flex:1;min-width:0;}
+.cc-vault-name{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;}
+.cc-vault-meta{font-size:11.5px;color:var(--mut2);margin-top:2px;}
+.cc-vault-go{display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line2);color:var(--accent);font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;border-radius:10px;cursor:pointer;transition:.15s;}
+.cc-vault-go:active{transform:scale(.95);}
+.cc-vault-go svg{width:15px;height:15px;}
 
 .cc-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch;}
 .cc-chips::-webkit-scrollbar{display:none;}
@@ -342,6 +349,8 @@ function byDate(a,b){return String(a.date||"").localeCompare(String(b.date||""))
 /* ====================== DATA MAPPERS ====================== */
 function relToDb(r){return {id:r.id,name:r.name,release_date:r.date,platforms:r.platforms||[]};}
 function relFromDb(x){return {id:x.id,name:x.name,date:x.release_date,platforms:x.platforms||[],createdAt:x.created_at};}
+function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||""};}
+function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",createdAt:x.created_at};}
 function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,stage:p.stage,platform:p.platform,post_date:p.date,status:p.status,cta:p.cta,caption:p.caption,asset_link:p.assetLink,results:p.results,asset_ready:!!p.assetReady,caption_ready:!!p.captionReady,winner:!!p.winner};}
 function postFromDb(x){return {id:x.id,releaseId:x.release_id,title:x.title,stage:x.stage,platform:x.platform,date:x.post_date,status:x.status,cta:x.cta,caption:x.caption,assetLink:x.asset_link||"",results:x.results||"",assetReady:!!x.asset_ready,captionReady:!!x.caption_ready,winner:!!x.winner};}
 
@@ -354,7 +363,8 @@ var S = {
   cal:(function(){var d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
   qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null,
   onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
-  wiz:null, wizOpen:false
+  wiz:null, wizOpen:false,
+  vault:[], vaultSchedule:null
 };
 var planSel = {platforms:["OnlyFans"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); }
@@ -378,11 +388,12 @@ function loadAndShow(){
 }
 function fetchAll(){
   if(!sb){return;}
-  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*") ]).then(function(r){
-    var rel=r[0], pos=r[1], setres=r[2];
+  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*"), sb.from("vault").select("*") ]).then(function(r){
+    var rel=r[0], pos=r[1], setres=r[2], vres=r[3];
     if(rel.error||pos.error){ sbErr(rel.error||pos.error); return; }
     S.releases=(rel.data||[]).map(relFromDb);
     S.posts=(pos.data||[]).map(postFromDb);
+    S.vault = (vres && !vres.error && vres.data) ? vres.data.map(vaultFromDb) : [];
     // campaign template + onboarding flag
     var srow = (setres && !setres.error && setres.data && setres.data[0]) ? setres.data[0] : null;
     if(srow && Array.isArray(srow.stages) && srow.stages.length){
@@ -492,6 +503,23 @@ function generate(name,date,platforms,stageIds){
       sb.from("posts").insert(newPosts.map(postToDb)).then(function(r2){ if(r2.error)sbErr(r2.error); });
     });
   }
+}
+function addVault(name,platforms,stageIds){
+  var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:"",createdAt:Date.now()};
+  S.vault.push(v);
+  flash('"'+name+'" saved to your Vault.');
+  if(sb)sb.from("vault").insert(vaultToDb(v)).then(function(r){ if(r.error)sbErr(r.error); });
+}
+function deleteVault(id){
+  S.vault=S.vault.filter(function(v){return v.id!==id;});
+  flash("Removed from Vault.");
+  if(sb)sb.from("vault").delete().eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
+}
+function scheduleVaultItem(id,date){
+  var v=S.vault.filter(function(x){return x.id===id;})[0]; if(!v)return;
+  S.vault=S.vault.filter(function(x){return x.id!==id;});
+  if(sb)sb.from("vault").delete().eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
+  generate(v.name,date,v.platforms.slice(),v.stageIds.slice());
 }
 function savePostFromForm(){
   var id=$("f_id").value||uid();
@@ -649,14 +677,33 @@ function releaseDetail(){
 function planView(){
   var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(planSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="pill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
   var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(planSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="pill-stage" data-v="'+s.id+'">'+esc(s.label)+'</button>';});
+  var vaultHTML="";
+  if(S.vault.length){
+    var items="";
+    S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
+      items+='<div class="cc-vault-item">'
+        +'<div class="cc-vault-main"><div class="cc-vault-name">'+esc(v.name)+'</div>'
+          +'<div class="cc-vault-meta">'+v.stageIds.length+' stage'+(v.stageIds.length===1?"":"s")+' · '+v.platforms.length+' platform'+(v.platforms.length===1?"":"s")+'</div></div>'
+        +'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+v.id+'">'+ic("clock",15)+' Schedule</button>'
+        +'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+v.id+'">'+ic("trash",16)+'</button>'
+      +'</div>';
+    });
+    vaultHTML='<h3 class="cc-sub-h">Your Vault ('+S.vault.length+')</h3>'
+      +'<p class="cc-note" style="margin:0 4px 10px">Ready-to-launch scenes with no date yet. Tap Schedule to pick a date and build the full campaign.</p>'
+      +items;
+  } else {
+    vaultHTML='<h3 class="cc-sub-h">Your Vault</h3>'+empty("layers","No saved scenes yet. Build one above and tap <b>Save to Vault</b> to park it until you pick a date.");
+  }
   return '<section class="cc-section"><h2 class="cc-h2">Plan a Release</h2>'
-    +'<p class="cc-sub">Enter a name + date. Every selected stage is auto-scheduled around release day with a platform-specific caption ready to edit.</p>'
+    +'<p class="cc-sub">Enter a name and date to build the full campaign now — or skip the date and save the scene to your Vault for later.</p>'
     +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" placeholder="e.g. Spring photoset"></label>'
-    +'<label class="cc-field"><span>Release date</span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
+    +'<label class="cc-field"><span>Release date <span style="color:var(--mut2);font-weight:400">— optional for Vault</span></span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
     +'<div class="cc-field"><span>Platforms <span style="color:var(--mut2);font-weight:400">— narrows this drop</span></span><div class="cc-wrap">'+plats+'</div></div>'
     +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
     +'<button class="cc-primary" data-action="generate">'+ic("sparkles")+' Generate schedule</button>'
+    +'<button class="cc-ghost full" data-action="vault-save" style="margin-top:10px">'+ic("layers")+' Save to Vault (no date yet)</button>'
     +'<button class="cc-ghost full" data-action="seed" style="margin-top:10px">Load example release</button>'
+    +vaultHTML
     +'</section>';
 }
 
@@ -774,6 +821,17 @@ function dateEditModal(){
     +'<p class="cc-note" style="margin:2px 0 16px">When you move the date, do you want the posts to move with it?</p>'
     +'<button class="cc-primary" data-action="date-shift" data-id="'+r.id+'" style="margin-bottom:10px">'+ic("check",16)+' Move date &amp; shift all posts</button>'
     +'<button class="cc-ghost full" data-action="date-only" data-id="'+r.id+'">Change date only — leave posts where they are</button>'
+    +'</div></div>';
+}
+
+function vaultScheduleModal(){
+  if(!S.vaultSchedule)return"";
+  var v=S.vault.filter(function(x){return x.id===S.vaultSchedule;})[0]; if(!v)return"";
+  return '<div class="cc-modal-bg" data-action="close-vsched"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Schedule "'+esc(v.name)+'"</h2><button class="cc-icon-btn" data-action="close-vsched">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Pick the release date. The full campaign — '+v.stageIds.length+' stage'+(v.stageIds.length===1?"":"s")+' across '+v.platforms.length+' platform'+(v.platforms.length===1?"":"s")+' — builds around it automatically.</p>'
+    +'<label class="cc-field"><span>Release date</span><input id="vs_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
+    +'<button class="cc-primary" data-action="vault-do-schedule" data-id="'+v.id+'">'+ic("sparkles",16)+' Build the campaign</button>'
     +'</div></div>';
 }
 
@@ -970,6 +1028,7 @@ function render(){
     +editorModal()
     +tplEditorModal()
     +dateEditModal()
+    +vaultScheduleModal()
     +confirmModal()
     +introOverlay();
   $("app").innerHTML=html;
@@ -1011,6 +1070,20 @@ document.addEventListener("click",function(e){
     return;
   }
   if(a==="seed"){ generate("Sample Drop",addDays(todayStr(),14),["OnlyFans","X","Reddit"],S.stages.map(function(s){return s.id;})); return; }
+  if(a==="vault-save"){
+    var vname=($("p_name").value||"").trim();
+    if(!vname){flash("Give the scene a name first.");return;}
+    if(!planSel.platforms.length){flash("Select at least one platform.");return;}
+    if(!planSel.stages.length){flash("Select at least one stage.");return;}
+    var vordered=S.stages.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
+    addVault(vname,planSel.platforms.slice(),vordered);
+    planSel={platforms:["OnlyFans"],stages:S.stages.map(function(s){return s.id;})};
+    render(); return;
+  }
+  if(a==="vault-schedule"){ S.vaultSchedule=id; render(); return; }
+  if(a==="close-vsched"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.vaultSchedule=null; render(); return; }
+  if(a==="vault-do-schedule"){ var vd=$("vs_date").value; if(!vd){flash("Pick a date.");return;} var vid=id; S.vaultSchedule=null; scheduleVaultItem(vid,vd); return; }
+  if(a==="vault-del"){ ask("Remove this scene from your Vault?",function(){deleteVault(id);},"Remove"); return; }
   if(a==="save-post"){ savePostFromForm(); return; }
   if(a==="del-post"){ ask("Delete this post?",function(){deletePost(id);},"Delete"); return; }
   if(a==="del-rel"){ var rid=id; ask("Delete this release and all of its posts? This can't be undone.",function(){deleteRelease(rid);},"Delete release"); return; }
