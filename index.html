@@ -366,8 +366,13 @@ var S = {
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null
 };
-var planSel = {platforms:["OnlyFans"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
-function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); }
+var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
+function templatePlatformUnion(){
+  var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
+  var out=ALL_PLAT.filter(function(p){return set[p];});
+  return out.length?out:["OnlyFans"];
+}
+function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); planSel.platforms = templatePlatformUnion(); }
 function flash(m){ S.toast=m; render(); clearTimeout(flash._t); flash._t=setTimeout(function(){S.toast="";render();},3200); }
 function ask(message,onYes,label){ S.confirm={message:message,onYes:onYes,label:label||"Confirm"}; render(); }
 function sbErr(e){ if(e){ flash("Sync issue: "+(e.message||e)); } }
@@ -1066,7 +1071,7 @@ document.addEventListener("click",function(e){
     if(!planSel.stages.length){flash("Select at least one stage.");return;}
     var ordered=S.stages.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     generate(name,date,planSel.platforms.slice(),ordered);
-    planSel={platforms:["OnlyFans"],stages:S.stages.map(function(s){return s.id;})};
+    resetPlanStages();
     return;
   }
   if(a==="seed"){ generate("Sample Drop",addDays(todayStr(),14),["OnlyFans","X","Reddit"],S.stages.map(function(s){return s.id;})); return; }
@@ -1077,7 +1082,7 @@ document.addEventListener("click",function(e){
     if(!planSel.stages.length){flash("Select at least one stage.");return;}
     var vordered=S.stages.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     addVault(vname,planSel.platforms.slice(),vordered);
-    planSel={platforms:["OnlyFans"],stages:S.stages.map(function(s){return s.id;})};
+    resetPlanStages();
     render(); return;
   }
   if(a==="vault-schedule"){ S.vaultSchedule=id; render(); return; }
