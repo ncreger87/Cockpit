@@ -237,6 +237,51 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-confirm-actions button:active{transform:scale(.97);}
 .cc-confirm-cancel{background:var(--card);color:var(--txt);border:1px solid var(--line2);}
 .cc-confirm-yes{background:var(--bad);color:#fff;border:1px solid var(--bad);}
+
+/* ====================== DESKTOP LAYOUT ====================== */
+@media (min-width:900px){
+  body{background:radial-gradient(110% 60% at 80% 0%, #221a28 0%, transparent 55%), var(--bg);}
+  #app{max-width:1120px;min-height:100vh;}
+  #app:has(.cc-nav){padding:0 0 48px 252px;}
+  /* bottom nav -> left sidebar */
+  .cc-nav{top:0;bottom:0;left:0;right:auto;width:220px;max-width:none;margin:0;flex-direction:column;
+    justify-content:flex-start;gap:4px;border-top:none;border-right:1px solid var(--line);
+    padding:26px 16px;background:rgba(16,14,22,.7);}
+  .cc-nav::before{content:"Creator Cockpit";display:block;font-family:'Fraunces',serif;font-size:20px;font-weight:600;
+    color:var(--txt);padding:4px 12px 22px;line-height:1.1;}
+  .cc-nav-btn{flex:none;flex-direction:row;justify-content:flex-start;gap:13px;width:100%;font-size:14.5px;
+    padding:12px 14px;border-radius:11px;}
+  .cc-nav-btn svg{width:19px;height:19px;}
+  .cc-nav-btn:hover{background:rgba(255,255,255,.04);color:var(--txt);}
+  .cc-nav-btn.on{background:rgba(242,166,90,.12);color:var(--accent);}
+  /* content breathing room + readable column */
+  .cc-header{padding-top:30px;}
+  .cc-header,.cc-strip,.cc-main{padding-left:40px;padding-right:40px;}
+  .cc-main{max-width:860px;}
+  .cc-section{animation:fade .3s ease;}
+  /* forms & lists read better capped */
+  .cc-field,.cc-tpl-box,.cc-account,.cc-data-row{max-width:620px;}
+  .cc-primary,.cc-ghost.full{max-width:620px;}
+  /* roomier calendar with a two-column month list */
+  .cc-cal{max-width:680px;}
+  .cc-cal-cell{aspect-ratio:auto;min-height:64px;font-size:15px;border-radius:11px;}
+  .cc-cal-wd{font-size:12px;}
+  .cc-cal-list{column-count:2;column-gap:20px;max-width:680px;}
+  .cc-cal-item{break-inside:avoid;}
+  /* vault items capped */
+  .cc-vault-item{max-width:680px;}
+  /* hover affordances */
+  .cc-pill:hover,.cc-chip:hover{border-color:var(--accent);}
+  .cc-cal-cell.has:hover{background:rgba(242,166,90,.2);}
+  /* bottom-sheet modals become centered dialogs */
+  .cc-modal-bg{align-items:center;}
+  .cc-modal{border-radius:20px;max-width:560px;max-height:88vh;animation:fade .2s ease;
+    padding:22px 22px 26px;}
+  .cc-toast{bottom:32px;left:calc(50% + 110px);}
+}
+@media (min-width:900px){
+  .cc-auth{max-width:420px;}
+}
 </style>
 </head>
 <body>
@@ -491,7 +536,7 @@ function generate(name,date,platforms,stageIds){
       usedPlats[pl]=true;
       newPosts.push({id:uid(),releaseId:rid,title:name+" — "+st.label,stage:st.label,platform:pl,
         date:addDays(date,st.offset),status:st.offset===0?"Draft":"Idea",cta:defaultCTA(st.offset),
-        caption:captionScaffold(name,st.offset,pl),assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
+        caption:"",assetLink:"",results:"",assetReady:false,captionReady:false,winner:false});
     });
   });
   if(!newPosts.length){ flash("No posts to create — none of the chosen stages post to the platforms you picked. Adjust platforms or your template."); return; }
@@ -794,7 +839,7 @@ function editorModal(){
     +'<div class="cc-two"><label class="cc-field"><span>Status</span>'+sel("f_status",p.status,STATUS_ORDER)+'</label>'
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
     +'<input type="hidden" id="f_stage" value="'+esc(p.stage||"Promo")+'">'
-    +'<label class="cc-field"><span>Caption</span><textarea id="f_caption" class="cc-input" rows="4">'+esc(p.caption||"")+'</textarea></label>'
+    +'<label class="cc-field"><span>Caption</span><textarea id="f_caption" class="cc-input" rows="4" placeholder="Write your caption…">'+esc(p.caption||"")+'</textarea></label>'
     +'<label class="cc-field"><span>Asset link</span><input id="f_asset" class="cc-input" value="'+esc(p.assetLink||"")+'" placeholder="Drive / file URL"></label>'
     +'<label class="cc-field"><span>Result notes</span><textarea id="f_results" class="cc-input" rows="2">'+esc(p.results||"")+'</textarea></label>'
     +'<div class="cc-checks">'
