@@ -241,10 +241,10 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 /* ====================== DESKTOP LAYOUT ====================== */
 @media (min-width:900px){
   body{background:radial-gradient(110% 60% at 80% 0%, #221a28 0%, transparent 55%), var(--bg);}
-  #app{max-width:1120px;min-height:100vh;}
-  #app:has(.cc-nav){padding:0 0 48px 252px;}
-  /* bottom nav -> left sidebar */
-  .cc-nav{top:0;bottom:0;left:0;right:auto;width:220px;max-width:none;margin:0;flex-direction:column;
+  #app{max-width:none;width:100%;min-height:100vh;margin:0;}
+  #app:has(.cc-nav){padding:0 0 48px 240px;}
+  /* bottom nav -> fixed left sidebar */
+  .cc-nav{top:0;bottom:0;left:0;right:auto;width:240px;max-width:none;margin:0;flex-direction:column;
     justify-content:flex-start;gap:4px;border-top:none;border-right:1px solid var(--line);
     padding:26px 16px;background:rgba(16,14,22,.7);}
   .cc-nav::before{content:"Creator Cockpit";display:block;font-family:'Fraunces',serif;font-size:20px;font-weight:600;
@@ -254,30 +254,28 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
   .cc-nav-btn svg{width:19px;height:19px;}
   .cc-nav-btn:hover{background:rgba(255,255,255,.04);color:var(--txt);}
   .cc-nav-btn.on{background:rgba(242,166,90,.12);color:var(--accent);}
-  /* content breathing room + readable column */
-  .cc-header{padding-top:30px;}
-  .cc-header,.cc-strip,.cc-main{padding-left:40px;padding-right:40px;}
-  .cc-main{max-width:860px;}
+  /* center a generous working column in the remaining space */
+  .cc-header,.cc-strip,.cc-main{max-width:1080px;margin-left:auto;margin-right:auto;
+    padding-left:48px;padding-right:48px;width:100%;}
+  .cc-header{padding-top:34px;}
   .cc-section{animation:fade .3s ease;}
-  /* forms & lists read better capped */
-  .cc-field,.cc-tpl-box,.cc-account,.cc-data-row{max-width:620px;}
-  .cc-primary,.cc-ghost.full{max-width:620px;}
-  /* roomier calendar with a two-column month list */
-  .cc-cal{max-width:680px;}
-  .cc-cal-cell{aspect-ratio:auto;min-height:64px;font-size:15px;border-radius:11px;}
+  /* forms & single-column reading content stay comfortable, not full-bleed */
+  .cc-field,.cc-tpl-box,.cc-account,.cc-data-row,.cc-primary,.cc-ghost.full,.cc-vault-item{max-width:760px;}
+  /* Plan: form and Vault side by side on wide screens */
+  /* roomier calendar */
+  .cc-cal{max-width:820px;}
+  .cc-cal-cell{aspect-ratio:auto;min-height:78px;font-size:16px;border-radius:12px;align-items:flex-start;padding:8px 0 0;}
   .cc-cal-wd{font-size:12px;}
-  .cc-cal-list{column-count:2;column-gap:20px;max-width:680px;}
+  .cc-cal-list{column-count:2;column-gap:24px;max-width:820px;}
   .cc-cal-item{break-inside:avoid;}
-  /* vault items capped */
-  .cc-vault-item{max-width:680px;}
   /* hover affordances */
-  .cc-pill:hover,.cc-chip:hover{border-color:var(--accent);}
+  .cc-pill:hover,.cc-chip:hover{border-color:var(--accent);cursor:pointer;}
   .cc-cal-cell.has:hover{background:rgba(242,166,90,.2);}
   /* bottom-sheet modals become centered dialogs */
   .cc-modal-bg{align-items:center;}
-  .cc-modal{border-radius:20px;max-width:560px;max-height:88vh;animation:fade .2s ease;
-    padding:22px 22px 26px;}
-  .cc-toast{bottom:32px;left:calc(50% + 110px);}
+  .cc-modal{border-radius:20px;max-width:600px;max-height:88vh;animation:fade .2s ease;
+    padding:24px 24px 28px;}
+  .cc-toast{bottom:32px;left:50%;}
 }
 @media (min-width:900px){
   .cc-auth{max-width:420px;}
