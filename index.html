@@ -267,6 +267,16 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-nav-badge{display:inline-block;min-width:16px;font-size:10px;font-weight:700;line-height:16px;text-align:center;
   background:var(--accent);color:#1a120a;border-radius:8px;padding:0 4px;margin-left:4px;}
 
+/* post handoff */
+.cc-ho-cap{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px;font-size:14.5px;
+  line-height:1.5;color:var(--txt);margin-bottom:14px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;}
+.cc-ho-link,.cc-ho-open{font-family:inherit;font-weight:600;}
+.cc-card-actions{display:flex;flex-direction:column;gap:8px;justify-content:center;}
+.cc-postnow{display:flex;align-items:center;gap:6px;background:var(--accent);color:#1a120a;border:none;
+  font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap;}
+.cc-postnow:active{transform:scale(.95);}
+.cc-postnow svg{width:15px;height:15px;}
+
 /* two-pane releases: mobile shows ONE pane at a time */
 .cc-rel-detail{display:none;}
 .cc-rel-layout.has-detail .cc-rel-main{display:none;}
@@ -363,6 +373,7 @@ function ic(name, size){
     trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
     download:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
     upload:'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>',
+    copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
     chevR:'<path d="m9 6 6 6-6 6"/>',
     chevL:'<path d="m15 6-6 6 6 6"/>',
     arrowR:'<path d="M5 12h14M13 6l6 6-6 6"/>',
@@ -389,6 +400,15 @@ var PLATFORMS = [
   {id:"X",group:"micro"},{id:"Bluesky",group:"micro"},
   {id:"Reddit",group:"reddit"},{id:"Instagram",group:"social"},{id:"TikTok",group:"social"}
 ];
+var PLATFORM_URL = {
+  OnlyFans:"https://onlyfans.com/my/posts/create",
+  JustForFans:"https://justfor.fans/",
+  X:"https://x.com/compose/post",
+  Bluesky:"https://bsky.app/",
+  Reddit:"https://www.reddit.com/submit",
+  Instagram:"https://www.instagram.com/",
+  TikTok:"https://www.tiktok.com/upload"
+};
 var PG = {}; PLATFORMS.forEach(function(p){PG[p.id]=p.group;});
 var ALL_PLAT = PLATFORMS.map(function(p){return p.id;});
 var DEFAULT_STAGES = [
@@ -472,7 +492,7 @@ var S = {
   qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null,
   onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
   wiz:null, wizOpen:false,
-  vault:[], vaultSchedule:null
+  vault:[], vaultSchedule:null, handoff:null
 };
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
@@ -701,7 +721,10 @@ function postCard(p){
         +badge(p.captionReady?"Caption ✓":"Caption ✗",p.captionReady?"ok":"no")
         +(p.winner?badge("Winner","win"):"")+'</div>'
     +'</div>'
-    +(canAdv?'<button class="cc-advance" data-action="advance" data-id="'+p.id+'">'+ic("arrowR")+'<span>'+esc(next)+'</span></button>':"")
+    +'<div class="cc-card-actions">'
+      +'<button class="cc-postnow" data-action="postnow" data-id="'+p.id+'">'+ic("upload",15)+'<span>Post</span></button>'
+      +(canAdv?'<button class="cc-advance" data-action="advance" data-id="'+p.id+'">'+ic("arrowR")+'<span>'+esc(next)+'</span></button>':"")
+    +'</div>'
     +'</div></div>';
 }
 function empty(icon,html){ return '<div class="cc-empty">'+ic(icon,26)+'<p>'+html+'</p></div>'; }
@@ -902,6 +925,32 @@ function tplEditorModal(){
     +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
     +'<button class="cc-ghost full" data-action="tpl-reset" style="margin-bottom:14px">Reset to default (D7 · D3 · D1 · Release · Follow-Up)</button>'
     +'<button class="cc-primary" data-action="tpl-save">'+ic("check",16)+' Save template</button>'
+    +'</div></div>';
+}
+
+function copyText(t){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t); return true; }
+  }catch(e){}
+  try{
+    var ta=document.createElement("textarea"); ta.value=t; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); return true;
+  }catch(e){ return false; }
+}
+function handoffModal(){
+  var p=S.handoff; if(!p)return"";
+  var url=PLATFORM_URL[p.platform]||"";
+  var cap=p.caption||"";
+  var hasCap=!!cap.trim();
+  return '<div class="cc-modal-bg" data-action="close-handoff"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Post to '+esc(p.platform)+'</h2><button class="cc-icon-btn" data-action="close-handoff">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">'+esc(p.title)+'</p>'
+    +'<div class="cc-ho-cap">'+(hasCap?esc(cap):'<span style="color:var(--mut2)">No caption written yet — tap Edit to add one.</span>')+'</div>'
+    +(hasCap?'<button class="cc-primary" data-action="ho-copy" style="margin-bottom:10px">'+ic("copy",16)+' Copy caption</button>':'<button class="cc-ghost full" data-action="ho-edit" data-id="'+esc(p.id)+'" style="margin-bottom:10px">'+ic("sparkles")+' Write a caption first</button>')
+    +(p.assetLink?'<a class="cc-ghost full cc-ho-link" href="'+esc(p.assetLink)+'" target="_blank" rel="noopener" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">'+ic("upload",16)+' Open your file</a>':'<div class="cc-note" style="margin:0 0 10px;text-align:center">No file link on this post.</div>')
+    +(url?'<a class="cc-primary cc-ho-open" href="'+esc(url)+'" target="_blank" rel="noopener" data-action="ho-open" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">'+ic("chevR",16)+' Open '+esc(p.platform)+'</a>':"")
+    +'<p class="cc-note" style="margin:14px 0 0">Tip: copy the caption first, then open '+esc(p.platform)+', paste it, and attach your file. One screen, no hunting.</p>'
+    +'<button class="cc-ghost full" data-action="ho-edit" data-id="'+esc(p.id)+'" style="margin-top:12px">'+ic("more",16)+' Edit this post instead</button>'
     +'</div></div>';
 }
 
@@ -1179,6 +1228,7 @@ function render(){
     +'<nav class="cc-nav">'+nav+'</nav>'
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
+    +handoffModal()
     +tplEditorModal()
     +dateEditModal()
     +vaultScheduleModal()
@@ -1202,6 +1252,11 @@ document.addEventListener("click",function(e){
   if(a==="add"){ S.editing=blankPost(); render(); return; }
   if(a==="edit"){ var p=S.posts.filter(function(x){return x.id===id;})[0]; if(p){S.editing=Object.assign({},p);render();} return; }
   if(a==="advance"){ advance(id); return; }
+  if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
+  if(a==="close-handoff"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.handoff=null; render(); return; }
+  if(a==="ho-copy"){ if(S.handoff && copyText(S.handoff.caption||"")){ flash("Caption copied — now open the app and paste."); } else { flash("Couldn't copy automatically — select the caption text to copy it."); } return; }
+  if(a==="ho-open"){ /* link handles opening; just note it */ return; }
+  if(a==="ho-edit"){ var ep=S.posts.filter(function(x){return x.id===id;})[0]; if(ep){ S.handoff=null; S.editing=Object.assign({},ep); render(); } return; }
   if(a==="open-rel"){ S.tab="releases"; S.openRelease=id; render(); return; }
   if(a==="back"){ S.openRelease=null; render(); return; }
   if(a==="relview"){ S.relView=el.getAttribute("data-v"); render(); return; }
