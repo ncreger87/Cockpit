@@ -947,8 +947,8 @@ function handoffModal(){
     +'<p class="cc-note" style="margin:0 0 14px">'+esc(p.title)+'</p>'
     +'<div class="cc-ho-cap">'+(hasCap?esc(cap):'<span style="color:var(--mut2)">No caption written yet — tap Edit to add one.</span>')+'</div>'
     +(hasCap?'<button class="cc-primary" data-action="ho-copy" style="margin-bottom:10px">'+ic("copy",16)+' Copy caption</button>':'<button class="cc-ghost full" data-action="ho-edit" data-id="'+esc(p.id)+'" style="margin-bottom:10px">'+ic("sparkles")+' Write a caption first</button>')
-    +(p.assetLink?'<a class="cc-ghost full cc-ho-link" href="'+esc(p.assetLink)+'" target="_blank" rel="noopener" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">'+ic("upload",16)+' Open your file</a>':'<div class="cc-note" style="margin:0 0 10px;text-align:center">No file link on this post.</div>')
-    +(url?'<a class="cc-primary cc-ho-open" href="'+esc(url)+'" target="_blank" rel="noopener" data-action="ho-open" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">'+ic("chevR",16)+' Open '+esc(p.platform)+'</a>':"")
+    +(p.assetLink?'<button class="cc-ghost full cc-ho-link" data-action="ho-openurl" data-url="'+esc(p.assetLink)+'" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">'+ic("upload",16)+' Open your file</button>':'<div class="cc-note" style="margin:0 0 10px;text-align:center">No file link on this post.</div>')
+    +(url?'<button class="cc-primary cc-ho-open" data-action="ho-openurl" data-url="'+esc(url)+'" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%">'+ic("chevR",16)+' Open '+esc(p.platform)+'</button>':"")
     +'<p class="cc-note" style="margin:14px 0 0">Tip: copy the caption first, then open '+esc(p.platform)+', paste it, and attach your file. One screen, no hunting.</p>'
     +'<button class="cc-ghost full" data-action="ho-edit" data-id="'+esc(p.id)+'" style="margin-top:12px">'+ic("more",16)+' Edit this post instead</button>'
     +'</div></div>';
@@ -1255,7 +1255,12 @@ document.addEventListener("click",function(e){
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
   if(a==="close-handoff"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.handoff=null; render(); return; }
   if(a==="ho-copy"){ if(S.handoff && copyText(S.handoff.caption||"")){ flash("Caption copied — now open the app and paste."); } else { flash("Couldn't copy automatically — select the caption text to copy it."); } return; }
-  if(a==="ho-open"){ /* link handles opening; just note it */ return; }
+  if(a==="ho-openurl"){
+    var ourl=el.getAttribute("data-url"); if(!ourl)return;
+    var w=window.open(ourl,"_blank","noopener,noreferrer");
+    if(!w){ try{ location.href=ourl; }catch(e){} }
+    return;
+  }
   if(a==="ho-edit"){ var ep=S.posts.filter(function(x){return x.id===id;})[0]; if(ep){ S.handoff=null; S.editing=Object.assign({},ep); render(); } return; }
   if(a==="open-rel"){ S.tab="releases"; S.openRelease=id; render(); return; }
   if(a==="back"){ S.openRelease=null; render(); return; }
@@ -1375,3 +1380,4 @@ boot();
 </script>
 </body>
 </html>
+
