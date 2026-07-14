@@ -277,6 +277,44 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-postnow:active{transform:scale(.95);}
 .cc-postnow svg{width:15px;height:15px;}
 
+/* ---- collabs ---- */
+:root{--collab:#79b8f3;}
+/* calendar: collab days are unmistakable */
+.cc-cal-cell.collab{background:rgba(121,184,243,.20);box-shadow:inset 0 0 0 1.5px rgba(121,184,243,.65);cursor:pointer;}
+.cc-cal-cell.collab::before{content:"COLLAB";font-size:7px;letter-spacing:.06em;font-weight:800;line-height:1;
+  color:#0b1520;background:var(--collab);border-radius:4px;padding:2px 4px;margin-bottom:2px;}
+.cc-cal-cell.collab.today{box-shadow:inset 0 0 0 2px var(--accent), inset 0 0 0 5px rgba(121,184,243,.35);}
+.cc-cal-cell.collab:hover{background:rgba(121,184,243,.3);}
+.cc-cal-item.is-collab .n{color:var(--collab);}
+.cc-collab-inline{font-size:9px;font-weight:800;letter-spacing:.06em;color:#0b1520;background:var(--collab);
+  border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;}
+/* collab cards */
+.cc-collab-card{display:flex;align-items:stretch;gap:12px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:0 14px 0 0;margin-bottom:10px;cursor:pointer;overflow:hidden;transition:.15s;}
+.cc-collab-card:active{transform:scale(.99);}
+.cc-collab-card:hover{border-color:var(--line2);}
+.cc-collab-card.past{opacity:.55;}
+.cc-collab-card > svg{align-self:center;color:var(--mut2);flex:none;}
+.cc-collab-bar{width:4px;flex:none;}
+.cc-collab-main{flex:1;min-width:0;padding:13px 0;}
+.cc-collab-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.cc-collab-name{font-family:'Fraunces',serif;font-size:16px;font-weight:600;}
+.cc-collab-status{font-size:10.5px;font-weight:700;border:1px solid;border-radius:7px;padding:1px 7px;}
+.cc-collab-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin-top:4px;}
+.cc-collab-meta svg{width:12px;height:12px;flex:none;}
+.cc-collab-notes{font-size:12.5px;color:var(--mut2);margin-top:6px;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.cc-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* paywall + trial banner */
+.cc-paywall .cc-paywall-btn{margin-top:8px;}
+.cc-paywall-foot{margin-top:24px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;}
+.cc-trial-banner{display:flex;align-items:center;gap:7px;justify-content:center;background:rgba(242,166,90,.10);
+  border:1px solid rgba(242,166,90,.32);color:var(--accent);border-radius:11px;padding:9px 14px;margin:0 0 16px;
+  font-size:13px;font-weight:500;}
+.cc-trial-banner .cc-link-btn{color:var(--accent);font-weight:700;text-decoration:underline;}
+.cc-trial-banner svg{width:14px;height:14px;flex:none;}
+
 /* two-pane releases: mobile shows ONE pane at a time */
 .cc-rel-detail{display:none;}
 .cc-rel-layout.has-detail .cc-rel-main{display:none;}
@@ -387,6 +425,7 @@ function ic(name, size){
     more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
     alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
     lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    users:'<path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
     target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5"/>',
     logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     rocket:'<path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M9 11a4 4 0 0 1 1-2.5C12 6 16 4 19 5c1 3-1 7-3.5 9A4 4 0 0 1 13 15M9 11l4 4M9 11l-4 1 2 2 1-3z"/>'
@@ -477,6 +516,10 @@ function byDate(a,b){return String(a.date||"").localeCompare(String(b.date||""))
 /* ====================== DATA MAPPERS ====================== */
 function relToDb(r){return {id:r.id,name:r.name,release_date:r.date,platforms:r.platforms||[],exclusive:r.exclusive||null};}
 function relFromDb(x){return {id:x.id,name:x.name,date:x.release_date,platforms:x.platforms||[],exclusive:x.exclusive||null,createdAt:x.created_at};}
+var COLLAB_STATUS=["Proposed","Confirmed","Shot","Released","Canceled"];
+var COLLAB_COLOR={Proposed:"#9b96a9",Confirmed:"#79b8f3",Shot:"#f2a65a",Released:"#3fb68b",Canceled:"#7a5560"};
+function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:c.status||"Proposed",notes:c.notes||""};}
+function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:x.status||"Proposed",notes:x.notes||"",createdAt:x.created_at};}
 function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||"",exclusive:v.exclusive||null};}
 function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",exclusive:x.exclusive||null,createdAt:x.created_at};}
 function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,stage:p.stage,platform:p.platform,post_date:p.date,status:p.status,cta:p.cta,caption:p.caption,asset_link:p.assetLink,results:p.results,asset_ready:!!p.assetReady,caption_ready:!!p.captionReady,winner:!!p.winner};}
@@ -492,8 +535,11 @@ var S = {
   qPlat:"All", qStatus:"All", editing:null, confirm:null, toast:"", tplEdit:null,
   onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
   wiz:null, wizOpen:false,
-  vault:[], vaultSchedule:null, handoff:null
+  vault:[], vaultSchedule:null, handoff:null,
+  plan:null, trialEnds:null, access:"unknown",
+  collabs:[], collabEdit:null, planName:""
 };
+var TRIAL_DAYS = 7;
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -521,12 +567,13 @@ function loadAndShow(){
 }
 function fetchAll(){
   if(!sb){return;}
-  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*"), sb.from("vault").select("*") ]).then(function(r){
-    var rel=r[0], pos=r[1], setres=r[2], vres=r[3];
+  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*"), sb.from("vault").select("*"), sb.from("collabs").select("*") ]).then(function(r){
+    var rel=r[0], pos=r[1], setres=r[2], vres=r[3], cres=r[4];
     if(rel.error||pos.error){ sbErr(rel.error||pos.error); return; }
     S.releases=(rel.data||[]).map(relFromDb);
     S.posts=(pos.data||[]).map(postFromDb);
     S.vault = (vres && !vres.error && vres.data) ? vres.data.map(vaultFromDb) : [];
+    S.collabs = (cres && !cres.error && cres.data) ? cres.data.map(collabFromDb) : [];
     // campaign template + onboarding flag
     var srow = (setres && !setres.error && setres.data && setres.data[0]) ? setres.data[0] : null;
     if(srow && Array.isArray(srow.stages) && srow.stages.length){
@@ -536,12 +583,42 @@ function fetchAll(){
       S.stages = cloneStages(DEFAULT_STAGES);
       saveTemplate(true);
     }
+    // access / plan
+    if(srow && srow.plan){ S.plan=srow.plan; S.trialEnds=srow.trial_ends||null; }
+    else if(!setres || !setres.error){
+      // brand-new user -> start a free trial automatically
+      S.plan="trial"; S.trialEnds=addDays(todayStr(),TRIAL_DAYS);
+      savePlan(true);
+    }
+    computeAccess();
     // show intro the first time (onboarded flag absent/false)
     if(srow && srow.onboarded){ S.onboarded=true; }
     else { S.onboarded=false; S.wizOpen=true; }
     resetPlanStages();
     render();
   }).catch(function(e){ sbErr(e); });
+}
+function trialDaysLeft(){
+  if(!S.trialEnds) return "0 days";
+  var ms = new Date(S.trialEnds+"T23:59:59") - new Date();
+  var d = Math.ceil(ms/86400000);
+  if(d<=0) return "ending today";
+  return d+(d===1?" day":" days");
+}
+function computeAccess(){
+  if(S.plan==="founder"||S.plan==="paid"){ S.access="active"; return; }
+  if(S.plan==="trial"){
+    if(S.trialEnds && S.trialEnds>=todayStr()){ S.access="trial"; }
+    else { S.access="expired"; }
+    return;
+  }
+  S.access="expired";
+}
+function savePlan(silent){
+  if(!sb || !S.user){ return; }
+  sb.from("settings").upsert({user_id:S.user.id, plan:S.plan, trial_ends:S.trialEnds||null, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){
+    if(r.error){ if(!silent) sbErr(r.error); }
+  });
 }
 function saveTemplate(silent){
   if(!sb || !S.user){ return; }
@@ -636,7 +713,7 @@ function generate(name,date,platforms,stageIds,exclusive){
   S.releases.push(rel);
   S.posts=S.posts.concat(newPosts);
   var n=newPosts.length;
-  S.tab="releases"; S.openRelease=rid;
+  S.tab="releases"; S.openRelease=rid; S.planName="";
   flash("Generated "+n+" post"+(n>1?"s":"")+" across "+relPlats.length+" platform"+(relPlats.length>1?"s":"")+".");
   if(sb){
     sb.from("releases").insert(relToDb(rel)).then(function(r){
@@ -644,6 +721,41 @@ function generate(name,date,platforms,stageIds,exclusive){
       sb.from("posts").insert(newPosts.map(postToDb)).then(function(r2){ if(r2.error)sbErr(r2.error); });
     });
   }
+}
+function saveCollabFromForm(){
+  var id=$("c_id").value||uid();
+  var partner=($("c_partner").value||"").trim();
+  var date=$("c_date").value;
+  if(!partner){ flash("Who's the collab with?"); return; }
+  if(!date){ flash("Pick a date for the shoot."); return; }
+  var c={id:id, partner:partner, date:date, time:($("c_time").value||""),
+    location:($("c_location").value||"").trim(), status:$("c_status").value||"Proposed",
+    notes:($("c_notes").value||"").trim(), createdAt:Date.now()};
+  var i=S.collabs.map(function(x){return x.id;}).indexOf(id);
+  var isNew = i<0;
+  if(isNew){ S.collabs.push(c); } else { c.createdAt=S.collabs[i].createdAt; S.collabs[i]=c; }
+  S.collabEdit=null;
+  flash(isNew?"Collab added to your calendar.":"Collab updated.");
+  if(sb){
+    sb.from("collabs").upsert(collabToDb(c),{onConflict:"id"}).then(function(r){ if(r.error)sbErr(r.error); });
+  }
+  render();
+}
+function deleteCollab(cid){
+  S.collabs=S.collabs.filter(function(c){return c.id!==cid;});
+  S.collabEdit=null;
+  flash("Collab removed.");
+  if(sb)sb.from("collabs").delete().eq("id",cid).then(function(r){ if(r.error)sbErr(r.error); });
+  render();
+}
+function collabToRelease(cid){
+  var c=S.collabs.filter(function(x){return x.id===cid;})[0]; if(!c)return;
+  S.planName = c.partner;
+  S.collabEdit=null;
+  S.tab="plan";
+  resetPlanStages();
+  flash("Name prefilled from your collab — pick a drop date and generate.");
+  render();
 }
 function addVault(name,platforms,stageIds,exclusive){
   var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:"",exclusive:exclusive||null,createdAt:Date.now()};
@@ -730,6 +842,55 @@ function postCard(p){
 function empty(icon,html){ return '<div class="cc-empty">'+ic(icon,26)+'<p>'+html+'</p></div>'; }
 function section(title,sub,bodyHtml){ return '<section class="cc-section"><h2 class="cc-h2">'+esc(title)+'</h2>'+(sub?'<p class="cc-sub">'+esc(sub)+'</p>':"")+bodyHtml+'</section>'; }
 
+function collabCard(c){
+  var col=COLLAB_COLOR[c.status]||"#888";
+  var when=fmtDate(c.date)+(c.time?" · "+esc(c.time):"");
+  var past = c.date<todayStr();
+  return '<div class="cc-collab-card'+(past?" past":"")+'" data-action="edit-collab" data-id="'+c.id+'">'
+    +'<div class="cc-collab-bar" style="background:'+col+'"></div>'
+    +'<div class="cc-collab-main">'
+      +'<div class="cc-collab-top"><span class="cc-collab-name">'+esc(c.partner)+'</span>'
+      +'<span class="cc-collab-status" style="color:'+col+';border-color:'+col+'44;background:'+col+'1a">'+esc(c.status)+'</span></div>'
+      +'<div class="cc-collab-meta">'+ic("clock",12)+' '+esc(when)+(c.location?' · '+ic("target",12)+' '+esc(c.location):"")+'</div>'
+      +(c.notes?'<div class="cc-collab-notes">'+esc(c.notes)+'</div>':"")
+    +'</div>'+ic("chevR")+'</div>';
+}
+function collabsView(){
+  var upcoming=S.collabs.filter(function(c){return c.date>=todayStr() && c.status!=="Canceled";}).sort(byDate);
+  var pastOnes=S.collabs.filter(function(c){return c.date<todayStr() || c.status==="Canceled";}).sort(byDate).reverse();
+  var inner='<button class="cc-primary" data-action="add-collab">'+ic("plus",16)+' Schedule a collab</button>';
+  if(upcoming.length){
+    inner+='<h3 class="cc-sub-h">Upcoming</h3>';
+    upcoming.forEach(function(c){ inner+=collabCard(c); });
+  } else {
+    inner+=empty("users","No collabs scheduled. Tap above to add your first shoot.");
+  }
+  if(pastOnes.length){
+    inner+='<h3 class="cc-sub-h">Past &amp; canceled</h3>';
+    pastOnes.forEach(function(c){ inner+=collabCard(c); });
+  }
+  return section("Collabs","Shoots with other creators — they show on your calendar, and turn into releases when they're in the can.",inner);
+}
+function collabEditorModal(){
+  var c=S.collabEdit; if(!c)return"";
+  var isNew=!c.partner && !S.collabs.some(function(x){return x.id===c.id;});
+  var opts=COLLAB_STATUS.map(function(s){return '<option value="'+s+'"'+(c.status===s?" selected":"")+'>'+s+'</option>';}).join("");
+  return '<div class="cc-modal-bg" data-action="close-collab"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+(isNew?"Schedule a collab":"Edit collab")+'</h2><button class="cc-icon-btn" data-action="close-collab">'+ic("x")+'</button></div>'
+    +'<input type="hidden" id="c_id" value="'+esc(c.id)+'">'
+    +'<label class="cc-field"><span>Collab with</span><input id="c_partner" class="cc-input" value="'+esc(c.partner||"")+'" placeholder="Their name or @handle"></label>'
+    +'<div class="cc-row2">'
+      +'<label class="cc-field"><span>Date</span><input id="c_date" type="date" class="cc-input" value="'+esc(c.date||todayStr())+'"></label>'
+      +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_time" type="time" class="cc-input" value="'+esc(c.time||"")+'"></label>'
+    +'</div>'
+    +'<label class="cc-field"><span>Location <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_location" class="cc-input" value="'+esc(c.location||"")+'" placeholder="Studio, city, or address"></label>'
+    +'<label class="cc-field"><span>Status</span><select id="c_status" class="cc-input">'+opts+'</select></label>'
+    +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="c_notes" class="cc-input" rows="3" placeholder="Ideas, who brings what, split of content…">'+esc(c.notes||"")+'</textarea></label>'
+    +'<button class="cc-primary" data-action="save-collab">'+ic("check",16)+' Save collab</button>'
+    +(!isNew?'<button class="cc-ghost full" data-action="collab-to-release" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("sparkles",16)+' Turn into a release</button>'
+      +'<button class="cc-ghost danger full" data-action="del-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete collab</button>':"")
+    +'</div></div>';
+}
 function calendarView(){
   var y=S.cal.y,m=S.cal.m;
   var firstDow=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), tStr=todayStr();
@@ -745,17 +906,25 @@ function calendarView(){
     var posts = S.posts.filter(function(p){ return f==="all" ? true : p.platform===f; });
     posts.forEach(function(p){ var d=inMonth(p.date); if(d){ (byDay[d]=byDay[d]||[]).push({kind:"post",post:p}); monthItems.push({kind:"post",date:p.date,post:p}); } });
   }
+  // collabs are their own layer — always visible, whatever the filter
+  var colByDay={};
+  S.collabs.forEach(function(c){
+    if(c.status==="Canceled") return;
+    var d=inMonth(c.date); if(d){ (colByDay[d]=colByDay[d]||[]).push(c); monthItems.push({kind:"collab",date:c.date,collab:c}); }
+  });
   monthItems.sort(byDate);
 
   var cells="";
   for(var i=0;i<firstDow;i++)cells+='<div class="cc-cal-cell blank"></div>';
   for(var d=1;d<=days;d++){
     var has=byDay[d];
+    var col=colByDay[d];
     var iso=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     var open = "";
     if(has){ open = has[0].kind==="rel" ? ' data-action="open-rel" data-id="'+has[0].rel.id+'"' : ' data-action="edit" data-id="'+has[0].post.id+'"'; }
+    else if(col){ open = ' data-action="edit-collab" data-id="'+col[0].id+'"'; }
     var dots = has ? '<span class="cc-cal-dot"></span>'+(has.length>1?'<span class="cc-cal-count">'+has.length+'</span>':"") : "";
-    cells+='<div class="cc-cal-cell'+(iso===tStr?" today":"")+(has?" has":"")+'"'+open+'><span>'+d+'</span>'+dots+'</div>';
+    cells+='<div class="cc-cal-cell'+(iso===tStr?" today":"")+(has?" has":"")+(col?" collab":"")+'"'+open+'><span>'+d+'</span>'+dots+'</div>';
   }
   var wd=""; WD.forEach(function(w){wd+='<div class="cc-cal-wd">'+w+'</div>';});
 
@@ -770,7 +939,9 @@ function calendarView(){
     monthItems.forEach(function(it){
       var rd=Number(it.date.split("-")[2]);
       var dlabel=MONTHS[m].slice(0,3)+" "+rd;
-      if(it.kind==="rel"){
+      if(it.kind==="collab"){
+        listHTML+='<div class="cc-cal-item is-collab" data-action="edit-collab" data-id="'+it.collab.id+'"><span class="d">'+dlabel+'</span><span class="n">'+ic("users",13)+' '+esc(it.collab.partner)+' <span class="cc-collab-inline">COLLAB</span></span>'+ic("chevR")+'</div>';
+      } else if(it.kind==="rel"){
         listHTML+='<div class="cc-cal-item" data-action="open-rel" data-id="'+it.rel.id+'"><span class="d">'+dlabel+'</span><span class="n">'+esc(it.rel.name)+'</span>'+ic("chevR")+'</div>';
       } else {
         var sc=STATUS_COLOR[it.post.status]||"#888";
@@ -845,7 +1016,7 @@ function planView(){
     +'<p class="cc-sub">Enter a name and date to build the full campaign now — or skip the date and save the scene to your Vault for later.</p>'
     +'<div class="cc-plan-grid">'
     +'<div class="cc-plan-form">'
-    +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" placeholder="e.g. Spring photoset"></label>'
+    +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" value="'+esc(S.planName||"")+'" placeholder="e.g. Spring photoset"></label>'
     +'<label class="cc-field"><span>Release date <span style="color:var(--mut2);font-weight:400">— optional for Vault</span></span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
     +'<div class="cc-field"><span>Platforms <span style="color:var(--mut2);font-weight:400">— narrows this drop</span></span><div class="cc-wrap">'+plats+'</div></div>'
     +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
@@ -888,7 +1059,9 @@ function moreView(){
     +'<h3 class="cc-sub-h">Backups</h3>'
     +'<div class="cc-data-row"><button class="cc-ghost" data-action="export">'+ic("download")+' Export</button><button class="cc-ghost" data-action="import">'+ic("upload")+' Import</button></div>'
     +'<button class="cc-ghost danger full" style="margin-top:10px" data-action="clear">'+ic("trash")+' Clear all</button>'
-    +'<p class="cc-note">Your data lives in your private cloud database and syncs to every device you sign in on. Export is just an extra offline copy.</p></section>';
+    +'<p class="cc-note">Your data lives in your private cloud database and syncs to every device you sign in on. Export is just an extra offline copy.</p>'
+    +'<h3 class="cc-sub-h">Help</h3>'
+    +'<p class="cc-note" style="margin-top:0">Questions, bugs, or ideas? Email <a href="mailto:Andy@Andymendoza.com" style="color:var(--accent)">Andy@Andymendoza.com</a> — I read every message.</p></section>';
 }
 
 function tplEditorModal(){
@@ -968,7 +1141,7 @@ function editorModal(){
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
     +'<input type="hidden" id="f_stage" value="'+esc(p.stage||"Promo")+'">'
     +'<label class="cc-field"><span>Caption</span><textarea id="f_caption" class="cc-input" rows="4" placeholder="Write your caption…">'+esc(p.caption||"")+'</textarea></label>'
-    +'<label class="cc-field"><span>Asset link</span><input id="f_asset" class="cc-input" value="'+esc(p.assetLink||"")+'" placeholder="Drive / file URL"></label>'
+    +'<label class="cc-field"><span>Asset link</span><input id="f_asset" class="cc-input" value="'+esc(p.assetLink||"")+'" placeholder="Paste a share link (iCloud, Drive, Dropbox…)"></label>'
     +'<label class="cc-field"><span>Result notes</span><textarea id="f_results" class="cc-input" rows="2">'+esc(p.results||"")+'</textarea></label>'
     +'<div class="cc-checks">'
       +'<div id="f_assetReady" class="cc-check'+(p.assetReady?" on":"")+'" data-action="chk">'+(p.assetReady?ic("check",13):"")+' Asset ready</div>'
@@ -1146,6 +1319,89 @@ function wizardOverlay(){
 
 function introOverlay(){ return wizardOverlay(); }
 
+/* Stripe payment link — replace with your real link from the Stripe dashboard */
+var CHECKOUT_URL = "https://buy.stripe.com/test_14AdRaa6hb6x1Ns800ao800";
+
+/* Attaches the signed-in user's id to the Stripe link.
+   The webhook reads client_reference_id to know WHO paid — without it, a payment can't be matched. */
+function checkoutUrl(){
+  var u = CHECKOUT_URL;
+  if(!S.user || !S.user.id) return u;
+  var sep = u.indexOf("?") >= 0 ? "&" : "?";
+  var q = "client_reference_id=" + encodeURIComponent(S.user.id);
+  if(S.user.email) q += "&prefilled_email=" + encodeURIComponent(S.user.email);
+  return u + sep + q;
+}
+function openCheckout(){
+  var u = checkoutUrl();
+  var w = window.open(u, "_blank", "noopener,noreferrer");
+  if(!w){ try{ location.href = u; }catch(e){} }
+  startAccessPolling();
+}
+
+/* ---- Instant access ----
+   The webhook flips the user to "paid" the moment Stripe confirms payment.
+   These helpers make the APP notice that on its own, so nobody has to tap anything. */
+var accessPoll = null, accessPollTicks = 0;
+
+function refreshAccess(cb){
+  if(!sb || !S.user) return;
+  sb.from("settings").select("plan,trial_ends").then(function(r){
+    if(r.error) return;
+    var row = (r.data && r.data[0]) ? r.data[0] : null;
+    if(row){
+      if(row.plan) S.plan = row.plan;
+      S.trialEnds = row.trial_ends || S.trialEnds;
+    }
+    var before = S.access;
+    computeAccess();
+    if(cb) cb(before, S.access);
+  });
+}
+function stopAccessPolling(){ if(accessPoll){ clearInterval(accessPoll); accessPoll = null; } }
+function startAccessPolling(){
+  stopAccessPolling();
+  accessPollTicks = 0;
+  accessPoll = setInterval(function(){
+    accessPollTicks++;
+    if(accessPollTicks > 60 || S.access !== "expired"){ stopAccessPolling(); return; } // give up after ~5 min
+    refreshAccess(function(before, after){
+      if(after !== "expired"){
+        stopAccessPolling();
+        flash("Payment confirmed — you're in. Welcome aboard.");
+        render();
+      }
+    });
+  }, 5000);
+}
+/* Coming back from the Stripe tab? Check immediately. */
+document.addEventListener("visibilitychange", function(){
+  if(!document.hidden && S.user && S.access === "expired"){
+    refreshAccess(function(before, after){
+      if(after !== "expired"){
+        stopAccessPolling();
+        flash("Payment confirmed — you're in. Welcome aboard.");
+        render();
+      }
+    });
+  }
+});
+
+function paywallScreen(){
+  var wasTrial = (S.plan==="trial");
+  return '<div class="cc-auth cc-paywall">'
+    +'<div class="cc-kicker">Creator Cockpit</div>'
+    +'<h1>'+(wasTrial?"Your free trial has ended":"Start your subscription")+'</h1>'
+    +'<p class="sub">'+(wasTrial?"Hope you got a feel for it. Subscribe to keep your campaigns, calendar, and posting handoff — all your data is saved and waiting.":"Subscribe to unlock the full cockpit. Your account and any data are saved.")+'</p>'
+    +'<button class="cc-primary cc-paywall-btn" data-action="subscribe-now" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%">'+ic("sparkles",16)+' Subscribe now</button>'
+    +'<button class="cc-ghost full" data-action="recheck-access" style="margin-top:12px">'+ic("check",15)+' Already paid? Check again</button>'
+    +'<div class="cc-paywall-foot">'
+      +'<p class="cc-note">Access unlocks automatically the moment your payment goes through — you don\'t need to do anything.</p>'
+      +'<button class="cc-link-btn" data-action="signout">Sign out</button>'
+    +'</div>'
+    +'</div>';
+}
+
 function authScreen(){
   var isSignup=S.authMode==="signup";
   return '<div class="cc-auth">'
@@ -1164,6 +1420,7 @@ function authScreen(){
 function render(){
   if(S.view==="loading"){ $("app").innerHTML='<div class="cc-loading-screen">'+ic("rocket",22)+'<span>Loading your cockpit…</span></div>'; return; }
   if(S.view==="auth" || !S.user){ $("app").innerHTML=authScreen(); return; }
+  if(S.access==="expired"){ $("app").innerHTML=paywallScreen(); return; }
 
   var due=S.posts.filter(isDue).sort(byDate);
   var todayPosts=S.posts.filter(isToday).sort(byDate);
@@ -1206,11 +1463,12 @@ function render(){
       +'<div class="cc-rel-main">'+mainPane+'</div>'
       +'<div class="cc-rel-detail">'+detailPane+'</div>'
       +'</div>';
+  } else if(S.tab==="collabs"){ body=collabsView();
   } else if(S.tab==="plan"){ body=planView(); }
   else if(S.tab==="queue"){ body=queueView(); }
   else if(S.tab==="more"){ body=moreView(); }
 
-  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["plan","Plan","sparkles"],["queue","Queue","list"],["more","More","more"]];
+  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["queue","Queue","list"],["more","More","more"]];
   var nav=""; navItems.forEach(function(t){
     var badge = (t[0]==="overdue" && overduePosts.length) ? '<span class="cc-nav-badge">'+overduePosts.length+'</span>' : "";
     nav+='<button class="cc-nav-btn'+(S.tab===t[0]?" on":"")+'" data-action="tab" data-tab="'+t[0]+'">'+ic(t[2],20)+'<span>'+t[1]+'</span>'+badge+'</button>';
@@ -1224,10 +1482,12 @@ function render(){
       +'<div class="cc-stat"><span class="cc-stat-n">'+S.releases.length+'</span><span class="cc-stat-l">releases</span></div>'
       +'<button class="cc-add" data-action="add">'+ic("plus",16)+' Post</button>'
     +'</div>'
+    +(S.access==="trial"?'<div class="cc-trial-banner">'+ic("clock",14)+' <span>Free trial — '+trialDaysLeft()+' left. <button class="cc-link-btn" data-action="subscribe-now">Subscribe</button> anytime to keep your data.</span></div>':"")
     +'<main class="cc-main">'+body+'</main>'
     +'<nav class="cc-nav">'+nav+'</nav>'
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
+    +collabEditorModal()
     +handoffModal()
     +tplEditorModal()
     +dateEditModal()
@@ -1247,12 +1507,28 @@ document.addEventListener("click",function(e){
   if(a==="auth-submit"){ doAuth(); return; }
   if(a==="auth-switch"){ S.authMode=(S.authMode==="signup"?"signin":"signup"); S.authMsg=""; render(); return; }
   if(a==="signout"){ ask("Sign out of this device? Your data stays safe in the cloud.",function(){signOut();},"Sign out"); return; }
+  if(a==="subscribe-now"){ openCheckout(); return; }
+  if(a==="recheck-access"){
+    flash("Checking your access…");
+    refreshAccess(function(before, after){
+      if(after === "expired"){ flash("Not active yet. If you just paid, give it a few seconds — it'll unlock on its own."); }
+      else { flash("You're in! Welcome aboard."); }
+      render();
+    });
+    return;
+  }
 
   if(a==="tab"){ S.tab=el.getAttribute("data-tab"); if(S.tab==="releases")S.openRelease=null; render(); return; }
   if(a==="add"){ S.editing=blankPost(); render(); return; }
   if(a==="edit"){ var p=S.posts.filter(function(x){return x.id===id;})[0]; if(p){S.editing=Object.assign({},p);render();} return; }
   if(a==="advance"){ advance(id); return; }
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
+  if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Proposed",notes:""}; render(); return; }
+  if(a==="edit-collab"){ var ec=S.collabs.filter(function(x){return x.id===id;})[0]; if(ec){ S.collabEdit=Object.assign({},ec); render(); } return; }
+  if(a==="close-collab"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.collabEdit=null; render(); return; }
+  if(a==="save-collab"){ saveCollabFromForm(); return; }
+  if(a==="del-collab"){ var dc=id; ask("Delete this collab? This won't touch any releases you made from it.",function(){deleteCollab(dc);},"Delete collab"); return; }
+  if(a==="collab-to-release"){ collabToRelease(id); return; }
   if(a==="close-handoff"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.handoff=null; render(); return; }
   if(a==="ho-copy"){ if(S.handoff && copyText(S.handoff.caption||"")){ flash("Caption copied — now open the app and paste."); } else { flash("Couldn't copy automatically — select the caption text to copy it."); } return; }
   if(a==="ho-openurl"){
@@ -1380,4 +1656,7 @@ boot();
 </script>
 </body>
 </html>
+
+
+ 
 
