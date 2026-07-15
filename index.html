@@ -1061,7 +1061,11 @@ function moreView(){
     +'<button class="cc-ghost danger full" style="margin-top:10px" data-action="clear">'+ic("trash")+' Clear all</button>'
     +'<p class="cc-note">Your data lives in your private cloud database and syncs to every device you sign in on. Export is just an extra offline copy.</p>'
     +'<h3 class="cc-sub-h">Help</h3>'
-    +'<p class="cc-note" style="margin-top:0">Questions, bugs, or ideas? Email <a href="mailto:Andy@Andymendoza.com" style="color:var(--accent)">Andy@Andymendoza.com</a> — I read every message.</p></section>';
+    +'<p class="cc-note" style="margin-top:0">Questions, bugs, or ideas? Email <a href="mailto:Andy@Andymendoza.com" style="color:var(--accent)">Andy@Andymendoza.com</a> — I read every message.</p>'
+    +(S.plan==="paid"?'<h3 class="cc-sub-h">Subscription</h3>'
+      +'<p class="cc-note" style="margin-top:0">Manage your plan, update your card, or cancel anytime.</p>'
+      +'<button class="cc-ghost full" data-action="manage-billing" style="margin-top:8px">'+ic("upload",15)+' Manage subscription</button>':"")
+    +'</section>';
 }
 
 function tplEditorModal(){
@@ -1321,6 +1325,8 @@ function introOverlay(){ return wizardOverlay(); }
 
 /* Stripe payment link — replace with your real link from the Stripe dashboard */
 var CHECKOUT_URL = "https://buy.stripe.com/00wbJ296teH71AVgLh18c00";
+/* Stripe customer portal — subscribers manage/cancel their own plan */
+var PORTAL_URL = "https://billing.stripe.com/p/login/00wbJ296teH71AVgLh18c00";
 
 /* Attaches the signed-in user's id to the Stripe link.
    The webhook reads client_reference_id to know WHO paid — without it, a payment can't be matched. */
@@ -1508,6 +1514,7 @@ document.addEventListener("click",function(e){
   if(a==="auth-switch"){ S.authMode=(S.authMode==="signup"?"signin":"signup"); S.authMsg=""; render(); return; }
   if(a==="signout"){ ask("Sign out of this device? Your data stays safe in the cloud.",function(){signOut();},"Sign out"); return; }
   if(a==="subscribe-now"){ openCheckout(); return; }
+  if(a==="manage-billing"){ var w=window.open(PORTAL_URL,"_blank","noopener,noreferrer"); if(!w){ try{location.href=PORTAL_URL;}catch(e){} } return; }
   if(a==="recheck-access"){
     flash("Checking your access…");
     refreshAccess(function(before, after){
@@ -1656,8 +1663,6 @@ boot();
 </script>
 </body>
 </html>
-
-
 
  
 
