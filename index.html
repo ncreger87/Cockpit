@@ -1056,7 +1056,7 @@ function moreView(){
     +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-tpl">'+ic("sparkles")+' Edit campaign template</button>'
     +'<h3 class="cc-sub-h">Winners ('+winners.length+')</h3>'+winHTML
     +'<h3 class="cc-sub-h">Backups</h3>'
-    +'<div class="cc-data-row"><button class="cc-ghost" data-action="export">'+ic("download")+' Export</button><button class="cc-ghost" data-action="import">'+ic("upload")+' Import</button></div>'
+    +'<button class="cc-ghost full" data-action="export">'+ic("download")+' Export a backup copy</button>'
     +'<button class="cc-ghost danger full" style="margin-top:10px" data-action="clear">'+ic("trash")+' Clear all</button>'
     +'<p class="cc-note">Your data lives in your private cloud database and syncs to every device you sign in on. Export is just an extra offline copy.</p>'
     +'<h3 class="cc-sub-h">Help</h3>'
@@ -1645,7 +1645,6 @@ document.addEventListener("click",function(e){
     S.stages=clean; S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
   if(a==="export"){ exportJSON(); return; }
-  if(a==="import"){ $("importFile").click(); return; }
   if(a==="clear"){ ask("Clear ALL releases and posts from the cloud? This can't be undone.",function(){clearAll();},"Clear all"); return; }
   if(a==="confirm-cancel"){ if(el.classList.contains("cc-confirm-bg") && e.target!==el) return; S.confirm=null; render(); return; }
   if(a==="confirm-yes"){ var fn=S.confirm&&S.confirm.onYes; S.confirm=null; render(); if(fn)fn(); return; }
@@ -1668,11 +1667,7 @@ document.addEventListener("change",function(e){
   else if(a==="tpl-dir"){ syncTplFromDOM(); render(); }
 });
 
-$("importFile").addEventListener("change",function(e){
-  var f=e.target.files&&e.target.files[0];
-  if(f){ var rd=new FileReader(); rd.onload=function(){ try{importData(JSON.parse(rd.result));}catch(err){flash("Couldn't read that file.");} }; rd.readAsText(f); }
-  e.target.value="";
-});
+$("importFile").addEventListener("change",function(e){ e.target.value=""; });
 
 if(sb && sb.auth && sb.auth.onAuthStateChange){
   sb.auth.onAuthStateChange(function(event,session){
