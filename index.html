@@ -277,6 +277,18 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-postnow:active{transform:scale(.95);}
 .cc-postnow svg{width:15px;height:15px;}
 
+/* status picker */
+.cc-status-dot{width:11px;height:11px;border-radius:50%;flex:none;display:inline-block;}
+.cc-advance .cc-status-dot{margin-bottom:3px;}
+.cc-status-sheet .cc-status-opt{display:flex;align-items:center;gap:12px;width:100%;background:var(--card2);
+  border:1px solid var(--line2);border-radius:12px;padding:14px 16px;margin-bottom:9px;cursor:pointer;
+  font-family:inherit;font-size:15px;color:var(--txt);transition:.15s;text-align:left;}
+.cc-status-sheet .cc-status-opt:active{transform:scale(.99);}
+.cc-status-sheet .cc-status-opt:hover{border-color:var(--accent);}
+.cc-status-sheet .cc-status-opt.cur{border-color:var(--accent);background:rgba(242,166,90,.08);}
+.cc-status-label{flex:1;font-weight:600;}
+.cc-status-check{color:var(--accent);display:flex;}
+
 /* ---- collabs ---- */
 :root{--collab:#79b8f3;}
 /* calendar: collab days are unmistakable */
@@ -537,7 +549,7 @@ var S = {
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null, handoff:null,
   plan:null, trialEnds:null, access:"unknown",
-  collabs:[], collabEdit:null, planName:""
+  collabs:[], collabEdit:null, planName:"", statusMenu:null
 };
 var TRIAL_DAYS = 7;
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
@@ -643,9 +655,10 @@ function doAuth(){
 function signOut(){ if(sb)sb.auth.signOut(); S.user=null; S.releases=[]; S.posts=[]; S.view="auth"; S.tab="today"; render(); }
 
 /* ====================== MUTATIONS (local + cloud) ====================== */
-function advance(id){
+function setStatus(id, status){
   var p=S.posts.filter(function(x){return x.id===id;})[0]; if(!p)return;
-  var i=STATUS_ORDER.indexOf(p.status); p.status=STATUS_ORDER[Math.min(i+1,STATUS_ORDER.length-1)];
+  if(STATUS_ORDER.indexOf(status)<0)return;
+  p.status=status; S.statusMenu=null;
   render();
   if(sb)sb.from("posts").update({status:p.status}).eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
 }
@@ -835,7 +848,7 @@ function postCard(p){
     +'</div>'
     +'<div class="cc-card-actions">'
       +'<button class="cc-postnow" data-action="postnow" data-id="'+p.id+'">'+ic("upload",15)+'<span>Post</span></button>'
-      +(canAdv?'<button class="cc-advance" data-action="advance" data-id="'+p.id+'">'+ic("arrowR")+'<span>'+esc(next)+'</span></button>':"")
+      +'<button class="cc-advance" data-action="status-menu" data-id="'+p.id+'"><span class="cc-status-dot" style="background:'+sc+'"></span><span>Status</span></button>'
     +'</div>'
     +'</div></div>';
 }
@@ -980,7 +993,7 @@ function releaseDetail(){
   });
   return '<section class="cc-section">'
     +'<button class="cc-back" data-action="back">'+ic("chevR")+' All releases</button>'
-    +'<div class="cc-detail-head">'+ring(releaseProgress(r.id),56,5)
+    +'<div class="cc-detail-head">'
       +'<div style="flex:1;min-width:0"><h2 class="cc-h2" style="margin:0">'+esc(r.name)+'</h2><p class="cc-sub" style="margin:2px 0 0">Release day '+esc(fmtDate(r.date))+' · '+rp.length+' posts</p>'+(r.exclusive?'<span class="cc-excl">'+ic("lock",11)+' '+esc(r.exclusive)+' exclusive</span>':"")+'</div>'
       +'<button class="cc-icon-btn danger" data-action="del-rel" data-id="'+r.id+'">'+ic("trash",17)+'</button></div>'
     +'<div class="cc-detail-actions">'
@@ -995,26 +1008,8 @@ function releaseDetail(){
 function planView(){
   var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(planSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="pill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
   var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(planSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="pill-stage" data-v="'+s.id+'">'+esc(s.label)+'</button>';});
-  var vaultHTML="";
-  if(S.vault.length){
-    var items="";
-    S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
-      items+='<div class="cc-vault-item">'
-        +'<div class="cc-vault-main"><div class="cc-vault-name">'+esc(v.name)+(v.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(v.exclusive)+'</span>':"")+'</div>'
-          +'<div class="cc-vault-meta">'+v.stageIds.length+' stage'+(v.stageIds.length===1?"":"s")+' · '+v.platforms.length+' platform'+(v.platforms.length===1?"":"s")+'</div></div>'
-        +'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+v.id+'">'+ic("clock",15)+' Schedule</button>'
-        +'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+v.id+'">'+ic("trash",16)+'</button>'
-      +'</div>';
-    });
-    vaultHTML='<h3 class="cc-sub-h">Your Vault ('+S.vault.length+')</h3>'
-      +'<p class="cc-note" style="margin:0 4px 10px">Ready-to-launch scenes with no date yet. Tap Schedule to pick a date and build the full campaign.</p>'
-      +items;
-  } else {
-    vaultHTML='<h3 class="cc-sub-h">Your Vault</h3>'+empty("layers","No saved scenes yet. Build one above and tap <b>Save to Vault</b> to park it until you pick a date.");
-  }
   return '<section class="cc-section"><h2 class="cc-h2">Plan a Release</h2>'
     +'<p class="cc-sub">Enter a name and date to build the full campaign now — or skip the date and save the scene to your Vault for later.</p>'
-    +'<div class="cc-plan-grid">'
     +'<div class="cc-plan-form">'
     +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" value="'+esc(S.planName||"")+'" placeholder="e.g. Spring photoset"></label>'
     +'<label class="cc-field"><span>Release date <span style="color:var(--mut2);font-weight:400">— optional for Vault</span></span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
@@ -1025,24 +1020,28 @@ function planView(){
     +'<button class="cc-ghost full" data-action="vault-save" style="margin-top:10px">'+ic("layers")+' Save to Vault (no date yet)</button>'
     +'<button class="cc-ghost full" data-action="seed" style="margin-top:10px">Load example release</button>'
     +'</div>'
-    +'<div class="cc-plan-vault">'+vaultHTML+'</div>'
-    +'</div>'
     +'</section>';
 }
 
-function queueView(){
-  var q=S.posts.filter(function(p){return (S.qPlat==="All"||p.platform===S.qPlat)&&(S.qStatus==="All"||p.status===S.qStatus);}).sort(byDate);
-  var opts1='<option>All</option>'; PLATFORMS.forEach(function(p){opts1+='<option'+(S.qPlat===p.id?" selected":"")+'>'+p.id+'</option>';});
-  var opts2='<option>All</option>'; STATUS_ORDER.forEach(function(s){opts2+='<option'+(S.qStatus===s?" selected":"")+'>'+s+'</option>';});
-  var cards=""; if(q.length){q.forEach(function(p){cards+=postCard(p);});}else{cards=empty("list","No posts match. Plan a release to fill the queue.");}
-  var filters='<div class="cc-filters"><select class="cc-select" data-action="filter-plat">'+opts1+'</select><select class="cc-select" data-action="filter-status">'+opts2+'</select></div>';
-  return section("Queue","Everything, by date.",filters+cards);
+function vaultView(){
+  var inner="";
+  if(S.vault.length){
+    S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
+      inner+='<div class="cc-vault-item">'
+        +'<div class="cc-vault-main"><div class="cc-vault-name">'+esc(v.name)+(v.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(v.exclusive)+'</span>':"")+'</div>'
+          +'<div class="cc-vault-meta">'+v.stageIds.length+' stage'+(v.stageIds.length===1?"":"s")+' · '+v.platforms.length+' platform'+(v.platforms.length===1?"":"s")+'</div></div>'
+        +'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+v.id+'">'+ic("clock",15)+' Schedule</button>'
+        +'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+v.id+'">'+ic("trash",16)+'</button>'
+      +'</div>';
+    });
+  } else {
+    inner=empty("layers","No saved scenes yet. Go to <b>Plan</b>, build a scene, and tap <b>Save to Vault</b> to park it here until you pick a date.");
+  }
+  return section("The Vault","Ready-to-launch scenes with no date yet. Tap Schedule to pick a date and build the full campaign.",inner);
 }
 
 function moreView(){
-  var needs=S.posts.filter(needsWork).sort(byDate);
   var winners=S.posts.filter(function(p){return p.winner;}).sort(byDate);
-  var needsHTML=""; if(needs.length){needs.slice(0,6).forEach(function(p){needsHTML+=postCard(p);});}else{needsHTML=empty("alert","Everything's prepped.");}
   var winHTML=""; if(winners.length){winners.forEach(function(p){winHTML+=postCard(p);});}else{winHTML=empty("star","Mark a post as a winner to reuse it later.");}
   var email = S.user && S.user.email ? S.user.email : "Signed in";
   var tplRows=""; S.stages.forEach(function(s){ var pl=(s.platforms||[]).join(", ")||"no platforms"; tplRows+='<div class="cc-tpl-line"><div style="flex:1;min-width:0"><span class="cc-stage">'+esc(s.label)+'</span> <em>'+esc(stageTiming(s.offset))+'</em><div class="cc-tpl-platnote">'+esc(pl)+'</div></div></div>'; });
@@ -1054,7 +1053,6 @@ function moreView(){
     +'<div class="cc-tpl-box">'+tplRows+'</div>'
     +'<button class="cc-primary" style="margin-top:12px" data-action="launch-wizard">'+ic("rocket",16)+' Set up my campaign (guided)</button>'
     +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-tpl">'+ic("sparkles")+' Edit campaign template</button>'
-    +'<h3 class="cc-sub-h">Needs Work ('+needs.length+')</h3>'+needsHTML
     +'<h3 class="cc-sub-h">Winners ('+winners.length+')</h3>'+winHTML
     +'<h3 class="cc-sub-h">Backups</h3>'
     +'<div class="cc-data-row"><button class="cc-ghost" data-action="export">'+ic("download")+' Export</button><button class="cc-ghost" data-action="import">'+ic("upload")+' Import</button></div>'
@@ -1113,6 +1111,25 @@ function copyText(t){
     var ta=document.createElement("textarea"); ta.value=t; ta.style.position="fixed"; ta.style.opacity="0";
     document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); return true;
   }catch(e){ return false; }
+}
+function statusMenuModal(){
+  var id=S.statusMenu; if(!id)return"";
+  var p=S.posts.filter(function(x){return x.id===id;})[0]; if(!p)return"";
+  var rows="";
+  STATUS_ORDER.forEach(function(st){
+    var col=STATUS_COLOR[st]||"#888";
+    var cur=(st===p.status);
+    rows+='<button class="cc-status-opt'+(cur?" cur":"")+'" data-action="set-status" data-id="'+id+'" data-status="'+st+'">'
+      +'<span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<span class="cc-status-label">'+esc(st)+'</span>'
+      +(cur?'<span class="cc-status-check">'+ic("check",15)+'</span>':"")
+      +'</button>';
+  });
+  return '<div class="cc-modal-bg" data-action="close-status"><div class="cc-modal cc-status-sheet" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Set status</h2><button class="cc-icon-btn" data-action="close-status">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 12px">'+esc(p.title)+'</p>'
+    +rows
+    +'</div></div>';
 }
 function handoffModal(){
   var p=S.handoff; if(!p)return"";
@@ -1459,7 +1476,7 @@ function render(){
     else if(S.releases.length){
       S.releases.slice().sort(byDate).forEach(function(r){
         var rp=S.posts.filter(function(p){return p.releaseId===r.id;});
-        mainInner+='<div class="cc-rel-card'+(S.openRelease===r.id?" active":"")+(r.exclusive?" excl":"")+'" data-action="open-rel" data-id="'+r.id+'">'+ring(releaseProgress(r.id))
+        mainInner+='<div class="cc-rel-card'+(S.openRelease===r.id?" active":"")+(r.exclusive?" excl":"")+'" data-action="open-rel" data-id="'+r.id+'">'
           +'<div class="cc-rel-mid"><div class="cc-rel-name">'+esc(r.name)+(r.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(r.exclusive)+'</span>':"")+'</div><div class="cc-rel-meta">Release '+esc(fmtDate(r.date))+' · '+rp.length+' posts · '+r.platforms.length+' platforms</div></div>'+ic("chevR")+'</div>';
       });
     } else { mainInner+=empty("rocket","No releases yet. Tap <b>Plan</b> to build your first one."); }
@@ -1471,10 +1488,10 @@ function render(){
       +'</div>';
   } else if(S.tab==="collabs"){ body=collabsView();
   } else if(S.tab==="plan"){ body=planView(); }
-  else if(S.tab==="queue"){ body=queueView(); }
+  else if(S.tab==="vault"){ body=vaultView(); }
   else if(S.tab==="more"){ body=moreView(); }
 
-  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["queue","Queue","list"],["more","More","more"]];
+  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["vault","Vault","layers"],["more","More","more"]];
   var nav=""; navItems.forEach(function(t){
     var badge = (t[0]==="overdue" && overduePosts.length) ? '<span class="cc-nav-badge">'+overduePosts.length+'</span>' : "";
     nav+='<button class="cc-nav-btn'+(S.tab===t[0]?" on":"")+'" data-action="tab" data-tab="'+t[0]+'">'+ic(t[2],20)+'<span>'+t[1]+'</span>'+badge+'</button>';
@@ -1494,6 +1511,7 @@ function render(){
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
     +collabEditorModal()
+    +statusMenuModal()
     +handoffModal()
     +tplEditorModal()
     +dateEditModal()
@@ -1528,7 +1546,9 @@ document.addEventListener("click",function(e){
   if(a==="tab"){ S.tab=el.getAttribute("data-tab"); if(S.tab==="releases")S.openRelease=null; render(); return; }
   if(a==="add"){ S.editing=blankPost(); render(); return; }
   if(a==="edit"){ var p=S.posts.filter(function(x){return x.id===id;})[0]; if(p){S.editing=Object.assign({},p);render();} return; }
-  if(a==="advance"){ advance(id); return; }
+  if(a==="status-menu"){ S.statusMenu=id; render(); return; }
+  if(a==="close-status"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.statusMenu=null; render(); return; }
+  if(a==="set-status"){ setStatus(id, el.getAttribute("data-status")); return; }
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
   if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Proposed",notes:""}; render(); return; }
   if(a==="edit-collab"){ var ec=S.collabs.filter(function(x){return x.id===id;})[0]; if(ec){ S.collabEdit=Object.assign({},ec); render(); } return; }
@@ -1663,6 +1683,3 @@ boot();
 </script>
 </body>
 </html>
-
- 
-
