@@ -78,7 +78,7 @@ input,select,textarea{font-family:inherit;}
 .cc-badge.no{color:var(--mut2);}
 .cc-badge.win{color:var(--accent);border-color:rgba(242,166,90,.45);}
 .cc-dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
-.cc-advance{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:62px;background:var(--card2);border:1px solid var(--line);color:var(--accent);border-radius:11px;cursor:pointer;font-size:10px;font-weight:600;padding:6px;transition:.15s;}
+.cc-advance{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:68px;background:var(--card2);border:1px solid var(--line);color:var(--accent);border-radius:11px;cursor:pointer;font-size:10px;font-weight:600;padding:6px 8px;transition:.15s;white-space:nowrap;}
 .cc-advance:active{transform:scale(.95);background:rgba(242,166,90,.12);}
 .cc-advance svg{width:16px;height:16px;}
 
@@ -567,6 +567,10 @@ function sbErr(e){ if(e){ flash("Sync issue: "+(e.message||e)); } }
 /* ====================== AUTH + LOAD ====================== */
 function boot(){
   if(!sb){ S.view="auth"; S.authMsg="Couldn't reach the cloud library. Check your connection and reload."; render(); return; }
+  // If arriving via a password-recovery link, don't auto-enter the app —
+  // wait for the PASSWORD_RECOVERY event to show the "set new password" screen.
+  var h = (location.hash||"") + (location.search||"");
+  if(h.indexOf("type=recovery") >= 0){ S.view="auth"; S.authMode="recovery"; render(); return; }
   S.view="loading"; render();
   sb.auth.getSession().then(function(res){
     var session = res && res.data && res.data.session;
@@ -651,6 +655,29 @@ function doAuth(){
     if(res.error){ S.authMsg=res.error.message; render(); return; }
     if(res.data && res.data.session && res.data.user){ S.user=res.data.user; S.authMsg=""; loadAndShow(); }
     else { S.authMsg="Account created — check your email to confirm, then sign in."; S.authMode="signin"; render(); }
+  }).catch(function(e){ S.authMsg=(e&&e.message)||"Something went wrong."; render(); });
+}
+function sendPasswordReset(){
+  var email=($("au_email").value||"").trim();
+  if(!email){ S.authMsg="Enter your email first."; render(); return; }
+  S.authMsg="Sending…"; render();
+  var redirect = location.origin + location.pathname;
+  sb.auth.resetPasswordForEmail(email, { redirectTo: redirect }).then(function(res){
+    if(res.error){ S.authMsg=res.error.message; render(); return; }
+    S.authMsg="Check your email for a reset link. Open it on this device, then you'll set a new password."; render();
+  }).catch(function(e){ S.authMsg=(e&&e.message)||"Something went wrong."; render(); });
+}
+function updatePassword(){
+  var p1=$("au_new1").value||"", p2=$("au_new2").value||"";
+  if(p1.length<6){ S.authMsg="Password must be at least 6 characters."; render(); return; }
+  if(p1!==p2){ S.authMsg="Those two passwords don't match."; render(); return; }
+  S.authMsg="Saving…"; render();
+  sb.auth.updateUser({ password: p1 }).then(function(res){
+    if(res.error){ S.authMsg=res.error.message; render(); return; }
+    S.authMsg="";
+    // they're already signed in from the recovery link — go straight into the app
+    if(res.data && res.data.user){ S.user=res.data.user; loadAndShow(); }
+    else { S.authMode="signin"; S.authMsg="Password updated — sign in with your new password."; render(); }
   }).catch(function(e){ S.authMsg=(e&&e.message)||"Something went wrong."; render(); });
 }
 function signOut(){ if(sb)sb.auth.signOut(); S.user=null; S.releases=[]; S.posts=[]; S.view="auth"; S.tab="today"; render(); }
@@ -849,7 +876,7 @@ function postCard(p){
     +'</div>'
     +'<div class="cc-card-actions">'
       +'<button class="cc-postnow" data-action="postnow" data-id="'+p.id+'">'+ic("upload",15)+'<span>Post</span></button>'
-      +'<button class="cc-advance" data-action="status-menu" data-id="'+p.id+'"><span class="cc-status-dot" style="background:'+sc+'"></span><span>Status</span></button>'
+      +'<button class="cc-advance" data-action="status-menu" data-id="'+p.id+'"><span class="cc-status-dot" style="background:'+sc+'"></span><span>'+esc(p.status)+'</span></button>'
     +'</div>'
     +'</div></div>';
 }
@@ -1427,6 +1454,28 @@ function paywallScreen(){
 }
 
 function authScreen(){
+  if(S.authMode==="recovery"){
+    return '<div class="cc-auth">'
+      +'<div class="cc-kicker">Private Posting Cockpit</div>'
+      +'<h1>Set a new password</h1>'
+      +'<p class="sub">Choose a new password for your account. You\'ll use it to sign in from now on.</p>'
+      +'<label class="cc-field"><span>New password</span><input id="au_new1" class="cc-input" type="password" autocomplete="new-password" placeholder="At least 6 characters"></label>'
+      +'<label class="cc-field"><span>Confirm new password</span><input id="au_new2" class="cc-input" type="password" autocomplete="new-password" placeholder="Type it again"></label>'
+      +'<button class="cc-primary" data-action="pw-update">Save new password</button>'
+      +'<div class="msg">'+esc(S.authMsg)+'</div>'
+      +'</div>';
+  }
+  if(S.authMode==="forgot"){
+    return '<div class="cc-auth">'
+      +'<div class="cc-kicker">Private Posting Cockpit</div>'
+      +'<h1>Reset your password</h1>'
+      +'<p class="sub">Enter your email and we\'ll send you a link to set a new password.</p>'
+      +'<label class="cc-field"><span>Email</span><input id="au_email" class="cc-input" type="email" autocomplete="email" placeholder="you@email.com"></label>'
+      +'<button class="cc-primary" data-action="pw-reset-send">Send reset link</button>'
+      +'<div class="msg">'+esc(S.authMsg)+'</div>'
+      +'<div class="switch"><button data-action="auth-back">Back to sign in</button></div>'
+      +'</div>';
+  }
   var isSignup=S.authMode==="signup";
   return '<div class="cc-auth">'
     +'<div class="cc-kicker">Private Posting Cockpit</div>'
@@ -1436,6 +1485,7 @@ function authScreen(){
     +'<label class="cc-field"><span>Password</span><input id="au_pass" class="cc-input" type="password" autocomplete="'+(isSignup?"new-password":"current-password")+'" placeholder="At least 6 characters"></label>'
     +'<button class="cc-primary" data-action="auth-submit">'+(isSignup?"Create account":"Sign in")+'</button>'
     +'<div class="msg">'+esc(S.authMsg)+'</div>'
+    +(isSignup?"":'<div class="switch" style="margin-top:6px"><button data-action="auth-forgot">Forgot password?</button></div>')
     +'<div class="switch">'+(isSignup?"Already have an account? ":"New here? ")+'<button data-action="auth-switch">'+(isSignup?"Sign in":"Create one")+'</button></div>'
     +'</div>';
 }
@@ -1531,6 +1581,10 @@ document.addEventListener("click",function(e){
 
   if(a==="auth-submit"){ doAuth(); return; }
   if(a==="auth-switch"){ S.authMode=(S.authMode==="signup"?"signin":"signup"); S.authMsg=""; render(); return; }
+  if(a==="auth-forgot"){ S.authMode="forgot"; S.authMsg=""; render(); return; }
+  if(a==="auth-back"){ S.authMode="signin"; S.authMsg=""; render(); return; }
+  if(a==="pw-reset-send"){ sendPasswordReset(); return; }
+  if(a==="pw-update"){ updatePassword(); return; }
   if(a==="signout"){ ask("Sign out of this device? Your data stays safe in the cloud.",function(){signOut();},"Sign out"); return; }
   if(a==="subscribe-now"){ openCheckout(); return; }
   if(a==="manage-billing"){ var w=window.open(PORTAL_URL,"_blank","noopener,noreferrer"); if(!w){ try{location.href=PORTAL_URL;}catch(e){} } return; }
@@ -1671,6 +1725,15 @@ $("importFile").addEventListener("change",function(e){ e.target.value=""; });
 
 if(sb && sb.auth && sb.auth.onAuthStateChange){
   sb.auth.onAuthStateChange(function(event,session){
+    if(event==="PASSWORD_RECOVERY"){
+      // arrived via a reset link — let them set a new password before entering
+      S.user = session ? session.user : S.user;
+      S.view = "auth";
+      S.authMode = "recovery";
+      S.authMsg = "";
+      render();
+      return;
+    }
     if(event==="SIGNED_OUT"){ S.user=null; S.view="auth"; render(); }
   });
 }
