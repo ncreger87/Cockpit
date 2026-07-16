@@ -24,8 +24,8 @@ html,body{background:var(--bg);}
 body{font-family:'Outfit',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--txt);
   background:radial-gradient(120% 80% at 100% 0%, #221a2a 0%, transparent 55%),
     radial-gradient(120% 80% at 0% 0%, #1a1622 0%, transparent 50%), var(--bg);
-  min-height:100vh;}
-#app{max-width:560px;margin:0 auto;padding-bottom:90px;position:relative;min-height:100vh;}
+  min-height:100vh;min-height:100dvh;}
+#app{max-width:560px;margin:0 auto;padding-bottom:calc(96px + env(safe-area-inset-bottom));position:relative;min-height:100vh;min-height:100dvh;}
 svg{display:block;}
 button{font-family:inherit;}
 input,select,textarea{font-family:inherit;}
@@ -33,7 +33,7 @@ input,select,textarea{font-family:inherit;}
 .cc-loading-screen{display:flex;align-items:center;justify-content:center;gap:10px;height:80vh;color:var(--mut);font-size:15px;}
 .cc-loading-screen svg{color:var(--accent);}
 
-.cc-auth{max-width:380px;margin:0 auto;padding:calc(60px + env(safe-area-inset-top)) 24px 40px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
+.cc-auth{max-width:380px;margin:0 auto;padding:calc(60px + env(safe-area-inset-top)) 24px 40px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;}
 .cc-auth .cc-kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:6px;}
 .cc-auth h1{font-family:'Fraunces',serif;font-size:34px;font-weight:600;line-height:1.05;letter-spacing:-.01em;}
 .cc-auth p.sub{color:var(--mut);font-size:14px;margin:8px 0 26px;line-height:1.5;}
@@ -340,7 +340,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 /* ====================== DESKTOP LAYOUT ====================== */
 @media (min-width:900px){
   body{background:radial-gradient(110% 60% at 80% 0%, #221a28 0%, transparent 55%), var(--bg);}
-  #app{max-width:none;width:100%;min-height:100vh;margin:0;}
+  #app{max-width:none;width:100%;min-height:100vh;min-height:100dvh;margin:0;}
   #app:has(.cc-nav){padding:0 0 48px 240px;}
   /* bottom nav -> fixed left sidebar */
   .cc-nav{top:0;bottom:0;left:0;right:auto;width:240px;max-width:none;margin:0;flex-direction:column;
@@ -437,6 +437,7 @@ function ic(name, size){
     more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
     alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
     lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    vault:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M9 14h6"/>',
     users:'<path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
     target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5"/>',
     logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
@@ -1491,7 +1492,7 @@ function render(){
   else if(S.tab==="vault"){ body=vaultView(); }
   else if(S.tab==="more"){ body=moreView(); }
 
-  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["vault","Vault","layers"],["more","More","more"]];
+  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["vault","Vault","vault"],["more","More","more"]];
   var nav=""; navItems.forEach(function(t){
     var badge = (t[0]==="overdue" && overduePosts.length) ? '<span class="cc-nav-badge">'+overduePosts.length+'</span>' : "";
     nav+='<button class="cc-nav-btn'+(S.tab===t[0]?" on":"")+'" data-action="tab" data-tab="'+t[0]+'">'+ic(t[2],20)+'<span>'+t[1]+'</span>'+badge+'</button>';
