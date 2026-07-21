@@ -41,6 +41,7 @@ input,select,textarea{font-family:inherit;}
 .cc-auth .switch button{background:none;border:none;color:var(--accent);font-size:13.5px;cursor:pointer;text-decoration:underline;}
 .cc-auth .msg{font-size:13px;color:var(--accent);margin-top:14px;text-align:center;min-height:18px;line-height:1.4;}
 
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--bg);z-index:90;pointer-events:none;}
 .cc-header{display:flex;align-items:flex-start;justify-content:space-between;padding:calc(20px + env(safe-area-inset-top)) 20px 10px;}
 .cc-kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:500;}
 .cc-h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;line-height:1.05;margin-top:4px;letter-spacing:-.01em;}
@@ -251,6 +252,8 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-excl{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:#d98ad6;
   background:rgba(217,138,214,.12);border:1px solid rgba(217,138,214,.4);border-radius:8px;padding:2px 8px;margin-top:6px;}
 .cc-rel-card.excl{border-left:3px solid #d98ad6;}
+.cc-rel-card.past{opacity:.62;}
+.cc-rel-card.past:hover{opacity:.85;}
 /* release detail action row */
 .cc-detail-actions{display:flex;gap:10px;margin-bottom:18px;}
 .cc-detail-actions .cc-ghost{flex:1;}
@@ -275,6 +278,25 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-postnow{display:flex;align-items:center;gap:6px;background:var(--accent);color:#1a120a;border:none;
   font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap;}
 .cc-postnow:active{transform:scale(.95);}
+/* collab board */
+.cc-board-col{margin-top:16px;}
+.cc-board-head{display:flex;align-items:center;gap:9px;padding:0 4px 9px;}
+.cc-board-title{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--txt);}
+.cc-board-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--mut);
+  background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;}
+.cc-board-card{display:flex;align-items:stretch;gap:0;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;margin-bottom:9px;overflow:hidden;}
+.cc-board-card-main{flex:1;padding:13px 14px;cursor:pointer;min-width:0;}
+.cc-board-card-main:active{background:var(--card2);}
+.cc-board-name{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--txt);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cc-board-meta{font-size:12.5px;color:var(--mut);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cc-board-move{display:flex;align-items:center;gap:5px;padding:0 14px;background:var(--card2);
+  border:none;border-left:1px solid var(--line);color:var(--mut);cursor:pointer;transition:.15s;}
+.cc-board-move:hover{background:var(--line);color:var(--accent);}
+.cc-board-move:active{transform:scale(.97);}
+.cc-board-empty{font-size:13px;color:var(--mut2);padding:10px 4px 4px;font-style:italic;}
 .cc-postnow svg{width:15px;height:15px;}
 
 /* status picker */
@@ -431,6 +453,7 @@ function ic(name, size){
     check:'<path d="M20 6 9 17l-5-5"/>',
     x:'<path d="M18 6 6 18M6 6l12 12"/>',
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     layers:'<path d="M12 2 2 7l10 5 10-5z"/><path d="M2 12l10 5 10-5M2 17l10 5 10-5"/>',
     sparkles:'<path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15l-1.8-4.2L5.5 9l4.7-1.3z"/>',
     list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
@@ -453,7 +476,7 @@ var PLATFORMS = [
   {id:"Reddit",group:"reddit"},{id:"Instagram",group:"social"},{id:"TikTok",group:"social"}
 ];
 var PLATFORM_URL = {
-  OnlyFans:"https://onlyfans.com/my/posts/create",
+  OnlyFans:"https://onlyfans.com/",
   JustForFans:"https://justfor.fans/",
   X:"https://x.com/compose/post",
   Bluesky:"https://bsky.app/",
@@ -524,15 +547,29 @@ function isOpen(p){return p.status!=="Posted"&&p.status!=="Reviewed";}
 function isDue(p){return p.date<=todayStr()&&isOpen(p);}
 function isToday(p){return p.date===todayStr()&&isOpen(p);}
 function isOverdue(p){return p.date<todayStr()&&isOpen(p);}
+/* Count RELEASES that need attention, not raw posts — a release needs attention
+   if any of its posts are due today or overdue and still unposted. */
+function releasesNeedingAttention(){
+  var ids={};
+  S.posts.forEach(function(p){ if(p.releaseId && isDue(p)) ids[p.releaseId]=true; });
+  return Object.keys(ids).length;
+}
+function releasesOverdue(){
+  var ids={};
+  S.posts.forEach(function(p){ if(p.releaseId && isOverdue(p)) ids[p.releaseId]=true; });
+  return Object.keys(ids).length;
+}
 function byDate(a,b){return String(a.date||"").localeCompare(String(b.date||""));}
 
 /* ====================== DATA MAPPERS ====================== */
 function relToDb(r){return {id:r.id,name:r.name,release_date:r.date,platforms:r.platforms||[],exclusive:r.exclusive||null};}
 function relFromDb(x){return {id:x.id,name:x.name,date:x.release_date,platforms:x.platforms||[],exclusive:x.exclusive||null,createdAt:x.created_at};}
-var COLLAB_STATUS=["Proposed","Confirmed","Shot","Released","Canceled"];
-var COLLAB_COLOR={Proposed:"#9b96a9",Confirmed:"#79b8f3",Shot:"#f2a65a",Released:"#3fb68b",Canceled:"#7a5560"};
-function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:c.status||"Proposed",notes:c.notes||""};}
-function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:x.status||"Proposed",notes:x.notes||"",createdAt:x.created_at};}
+var COLLAB_STATUS=["Tentative","Confirmed","Shot","Canceled"];
+var COLLAB_COLOR={Tentative:"#9b96a9",Confirmed:"#79b8f3",Shot:"#3fb68b",Canceled:"#7a5560"};
+/* Map any legacy status from before the four-status change */
+function normStatus(v){ if(v==="Proposed")return "Tentative"; if(v==="Released")return "Shot"; return (COLLAB_STATUS.indexOf(v)>=0? v : "Tentative"); }
+function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:normStatus(c.status),notes:c.notes||""};}
+function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:normStatus(x.status),notes:x.notes||"",createdAt:x.created_at};}
 function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||"",exclusive:v.exclusive||null};}
 function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",exclusive:x.exclusive||null,createdAt:x.created_at};}
 function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,stage:p.stage,platform:p.platform,post_date:p.date,status:p.status,cta:p.cta,caption:p.caption,asset_link:p.assetLink,results:p.results,asset_ready:!!p.assetReady,caption_ready:!!p.captionReady,winner:!!p.winner};}
@@ -550,7 +587,8 @@ var S = {
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null, handoff:null,
   plan:null, trialEnds:null, access:"unknown",
-  collabs:[], collabEdit:null, planName:"", statusMenu:null
+  collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
+  collabView:"list", collabStatusMenu:null
 };
 var TRIAL_DAYS = 7;
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
@@ -560,6 +598,9 @@ function templatePlatformUnion(){
   return out.length?out:["OnlyFans"];
 }
 function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.id;}); planSel.platforms = templatePlatformUnion(); }
+/* Separate selection state for the "Add to Vault" form so it never clashes with the Plan tab */
+var vaultSel = {platforms:[], stages:[]};
+function resetVaultSel(){ vaultSel.stages = S.stages.map(function(s){return s.id;}); vaultSel.platforms = templatePlatformUnion(); }
 function flash(m){ S.toast=m; render(); clearTimeout(flash._t); flash._t=setTimeout(function(){S.toast="";render();},3200); }
 function ask(message,onYes,label){ S.confirm={message:message,onYes:onYes,label:label||"Confirm"}; render(); }
 function sbErr(e){ if(e){ flash("Sync issue: "+(e.message||e)); } }
@@ -770,7 +811,7 @@ function saveCollabFromForm(){
   if(!partner){ flash("Who's the collab with?"); return; }
   if(!date){ flash("Pick a date for the shoot."); return; }
   var c={id:id, partner:partner, date:date, time:($("c_time").value||""),
-    location:($("c_location").value||"").trim(), status:$("c_status").value||"Proposed",
+    location:($("c_location").value||"").trim(), status:normStatus($("c_status").value),
     notes:($("c_notes").value||"").trim(), createdAt:Date.now()};
   var i=S.collabs.map(function(x){return x.id;}).indexOf(id);
   var isNew = i<0;
@@ -896,10 +937,48 @@ function collabCard(c){
       +(c.notes?'<div class="cc-collab-notes">'+esc(c.notes)+'</div>':"")
     +'</div>'+ic("chevR")+'</div>';
 }
+function collabBoardCard(c){
+  var col=COLLAB_COLOR[c.status]||"#888";
+  var when=fmtDate(c.date)+(c.time?" · "+esc(c.time):"");
+  return '<div class="cc-board-card">'
+    +'<div class="cc-board-card-main" data-action="edit-collab" data-id="'+c.id+'">'
+      +'<div class="cc-board-name">'+esc(c.partner)+'</div>'
+      +'<div class="cc-board-meta">'+esc(when)+(c.location?' · '+esc(c.location):"")+'</div>'
+    +'</div>'
+    +'<button class="cc-board-move" data-action="collab-status-menu" data-id="'+c.id+'" title="Move to another stage">'
+      +'<span class="cc-status-dot" style="background:'+col+'"></span>'+ic("chevR",14)+'</button>'
+  +'</div>';
+}
+
+function collabBoard(){
+  var out="";
+  COLLAB_STATUS.forEach(function(st){
+    var col=COLLAB_COLOR[st]||"#888";
+    var inCol=S.collabs.filter(function(c){return normStatus(c.status)===st;}).sort(byDate);
+    out+='<div class="cc-board-col">'
+      +'<div class="cc-board-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
+        +'<span class="cc-board-title">'+esc(st)+'</span>'
+        +'<span class="cc-board-count">'+inCol.length+'</span></div>';
+    if(inCol.length){ inCol.forEach(function(c){ out+=collabBoardCard(c); }); }
+    else { out+='<div class="cc-board-empty">Nothing here yet</div>'; }
+    out+='</div>';
+  });
+  return out;
+}
+
 function collabsView(){
-  var upcoming=S.collabs.filter(function(c){return c.date>=todayStr() && c.status!=="Canceled";}).sort(byDate);
-  var pastOnes=S.collabs.filter(function(c){return c.date<todayStr() || c.status==="Canceled";}).sort(byDate).reverse();
-  var inner='<button class="cc-primary" data-action="add-collab">'+ic("plus",16)+' Schedule a collab</button>';
+  var toggle='<div class="cc-toggle"><button class="'+(S.collabView!=="board"?"on":"")+'" data-action="collabview" data-v="list">List</button>'
+    +'<button class="'+(S.collabView==="board"?"on":"")+'" data-action="collabview" data-v="board">Board</button></div>';
+  var inner='<button class="cc-primary" data-action="add-collab">'+ic("plus",16)+' Schedule a collab</button>'+toggle;
+
+  if(S.collabView==="board"){
+    if(S.collabs.length){ inner+=collabBoard(); }
+    else { inner+=empty("users","No collabs scheduled. Tap above to add your first shoot."); }
+    return section("Collabs","Tap the arrow on a card to move it to another stage. Changes show everywhere instantly.",inner);
+  }
+
+  var upcoming=S.collabs.filter(function(c){return c.date>=todayStr() && normStatus(c.status)!=="Canceled";}).sort(byDate);
+  var pastOnes=S.collabs.filter(function(c){return c.date<todayStr() || normStatus(c.status)==="Canceled";}).sort(byDate).reverse();
   if(upcoming.length){
     inner+='<h3 class="cc-sub-h">Upcoming</h3>';
     upcoming.forEach(function(c){ inner+=collabCard(c); });
@@ -981,7 +1060,8 @@ function calendarView(){
       var rd=Number(it.date.split("-")[2]);
       var dlabel=MONTHS[m].slice(0,3)+" "+rd;
       if(it.kind==="collab"){
-        listHTML+='<div class="cc-cal-item is-collab" data-action="edit-collab" data-id="'+it.collab.id+'"><span class="d">'+dlabel+'</span><span class="n">'+ic("users",13)+' '+esc(it.collab.partner)+' <span class="cc-collab-inline">COLLAB</span></span>'+ic("chevR")+'</div>';
+        var ccol=COLLAB_COLOR[it.collab.status]||"#9b96a9";
+        listHTML+='<div class="cc-cal-item is-collab" data-action="edit-collab" data-id="'+it.collab.id+'"><span class="d">'+dlabel+'</span><span class="n">'+ic("users",13)+' '+esc(it.collab.partner)+' <span class="cc-collab-inline">COLLAB</span> <span class="cc-collab-status" style="color:'+ccol+';border-color:'+ccol+'44;background:'+ccol+'1a">'+esc(it.collab.status)+'</span></span>'+ic("chevR")+'</div>';
       } else if(it.kind==="rel"){
         listHTML+='<div class="cc-cal-item" data-action="open-rel" data-id="'+it.rel.id+'"><span class="d">'+dlabel+'</span><span class="n">'+esc(it.rel.name)+'</span>'+ic("chevR")+'</div>';
       } else {
@@ -1052,7 +1132,7 @@ function planView(){
 }
 
 function vaultView(){
-  var inner="";
+  var inner='<button class="cc-primary" data-action="vault-new-open">'+ic("plus",16)+' Add a scene to the Vault</button>';
   if(S.vault.length){
     S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
       inner+='<div class="cc-vault-item">'
@@ -1063,7 +1143,7 @@ function vaultView(){
       +'</div>';
     });
   } else {
-    inner=empty("layers","No saved scenes yet. Go to <b>Plan</b>, build a scene, and tap <b>Save to Vault</b> to park it here until you pick a date.");
+    inner+=empty("layers","No saved scenes yet. Tap <b>Add a scene to the Vault</b> above to park one until you're ready to pick a date.");
   }
   return section("The Vault","Ready-to-launch scenes with no date yet. Tap Schedule to pick a date and build the full campaign.",inner);
 }
@@ -1139,6 +1219,46 @@ function copyText(t){
     var ta=document.createElement("textarea"); ta.value=t; ta.style.position="fixed"; ta.style.opacity="0";
     document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); return true;
   }catch(e){ return false; }
+}
+function vaultNewModal(){
+  if(!S.vaultNew)return"";
+  var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(vaultSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="vpill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
+  var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(vaultSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="vpill-stage" data-v="'+s.id+'">'+esc(s.label)+'</button>';});
+  return '<div class="cc-modal-bg" data-action="close-vault-new"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Add to Vault</h2><button class="cc-icon-btn" data-action="close-vault-new">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Park a ready scene without a date. Pick a date later and the full campaign builds itself.</p>'
+    +'<label class="cc-field"><span>Scene name</span><input id="v_name" class="cc-input" placeholder="e.g. Hotel shoot with Andy"></label>'
+    +'<div class="cc-field"><span>Platforms</span><div class="cc-wrap">'+plats+'</div></div>'
+    +'<div class="cc-field"><span>Campaign stages</span><div class="cc-wrap">'+stages+'</div></div>'
+    +'<label class="cc-field"><span>Exclusive to a platform? <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="v_excl" class="cc-input"><option value="">Not exclusive</option>'+PLATFORMS.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.id)+' only</option>';}).join("")+'</select></label>'
+    +'<button class="cc-primary" data-action="vault-new-save">'+ic("layers",16)+' Save to Vault</button>'
+    +'</div></div>';
+}
+function collabStatusMenuModal(){
+  var id=S.collabStatusMenu; if(!id)return"";
+  var c=S.collabs.filter(function(x){return x.id===id;})[0]; if(!c)return"";
+  var rows="";
+  COLLAB_STATUS.forEach(function(st){
+    var col=COLLAB_COLOR[st]||"#888";
+    var cur=(normStatus(c.status)===st);
+    rows+='<button class="cc-status-opt'+(cur?" cur":"")+'" data-action="set-collab-status" data-id="'+id+'" data-status="'+st+'">'
+      +'<span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<span class="cc-status-label">'+esc(st)+'</span>'
+      +(cur?'<span class="cc-status-check">'+ic("check",15)+'</span>':"")
+      +'</button>';
+  });
+  return '<div class="cc-modal-bg" data-action="close-collab-status"><div class="cc-modal cc-status-sheet" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Move collab</h2><button class="cc-icon-btn" data-action="close-collab-status">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 12px">'+esc(c.partner)+'</p>'
+    +rows
+    +'</div></div>';
+}
+function setCollabStatus(id,status){
+  var c=S.collabs.filter(function(x){return x.id===id;})[0]; if(!c)return;
+  if(COLLAB_STATUS.indexOf(status)<0)return;
+  c.status=status; S.collabStatusMenu=null;
+  render();
+  if(sb)sb.from("collabs").update({status:status}).eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
 }
 function statusMenuModal(){
   var id=S.statusMenu; if(!id)return"";
@@ -1521,17 +1641,34 @@ function render(){
     } else { oc=empty("check","No overdue posts. Nicely done."); }
     body=section("Overdue","Posts past their date that aren't marked posted yet. Clear them individually, or mark a whole scene posted.",oc);
   } else if(S.tab==="releases"){
-    var toggle='<div class="cc-toggle"><button class="'+(S.relView==="calendar"?"on":"")+'" data-action="relview" data-v="calendar">Calendar</button><button class="'+(S.relView==="list"?"on":"")+'" data-action="relview" data-v="list">List</button></div>';
+    var toggle='<div class="cc-toggle"><button class="'+(S.relView==="calendar"?"on":"")+'" data-action="relview" data-v="calendar">Month</button><button class="'+(S.relView==="list"?"on":"")+'" data-action="relview" data-v="list">List</button></div>';
     var mainInner=toggle;
     if(S.relView==="calendar"){ mainInner+=calendarView(); }
     else if(S.releases.length){
-      S.releases.slice().sort(byDate).forEach(function(r){
+      var t0=todayStr();
+      var sorted=S.releases.slice().sort(byDate);
+      var upcoming=sorted.filter(function(r){return r.date>=t0;});
+      var past=sorted.filter(function(r){return r.date<t0;}).reverse();
+      var shown = S.showPast ? upcoming.concat(past) : upcoming;
+      function relCard(r, isPast){
         var rp=S.posts.filter(function(p){return p.releaseId===r.id;});
-        mainInner+='<div class="cc-rel-card'+(S.openRelease===r.id?" active":"")+(r.exclusive?" excl":"")+'" data-action="open-rel" data-id="'+r.id+'">'
-          +'<div class="cc-rel-mid"><div class="cc-rel-name">'+esc(r.name)+(r.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(r.exclusive)+'</span>':"")+'</div><div class="cc-rel-meta">Release '+esc(fmtDate(r.date))+' · '+rp.length+' posts · '+r.platforms.length+' platforms</div></div>'+ic("chevR")+'</div>';
-      });
+        var openCount=rp.filter(isOpen).length;
+        return '<div class="cc-rel-card'+(S.openRelease===r.id?" active":"")+(r.exclusive?" excl":"")+(isPast?" past":"")+'" data-action="open-rel" data-id="'+r.id+'">'
+          +'<div class="cc-rel-mid"><div class="cc-rel-name">'+esc(r.name)+(r.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(r.exclusive)+'</span>':"")+'</div>'
+          +'<div class="cc-rel-meta">Release '+esc(fmtDate(r.date))+' · '+rp.length+' posts · '+r.platforms.length+' platforms'+(isPast&&openCount?' · <span style="color:var(--accent)">'+openCount+' unfinished</span>':"")+'</div></div>'+ic("chevR")+'</div>';
+      }
+      if(upcoming.length){ upcoming.forEach(function(r){ mainInner+=relCard(r,false); }); }
+      else if(!S.showPast){ mainInner+=empty("rocket","No upcoming releases. Tap <b>Plan</b> to schedule your next drop."); }
+      if(S.showPast && past.length){
+        mainInner+='<h3 class="cc-sub-h">Past releases</h3>';
+        past.forEach(function(r){ mainInner+=relCard(r,true); });
+      }
+      if(past.length){
+        mainInner+='<button class="cc-ghost full" data-action="toggle-past" style="margin-top:12px">'
+          +(S.showPast?ic("chevR",15)+' Hide past releases':ic("clock",15)+' Show past releases ('+past.length+')')+'</button>';
+      }
     } else { mainInner+=empty("rocket","No releases yet. Tap <b>Plan</b> to build your first one."); }
-    var mainPane='<section class="cc-section"><h2 class="cc-h2">Releases</h2><p class="cc-sub">Tap a release to open its full drip sequence.</p>'+mainInner+'</section>';
+    var mainPane='<section class="cc-section"><h2 class="cc-h2">Calendar</h2><p class="cc-sub">Your releases and collabs by date. Tap any item to open it.</p>'+mainInner+'</section>';
     var detailPane = S.openRelease ? releaseDetail() : '<div class="cc-rel-placeholder">'+ic("layers",34)+'<p>Select a release to see its posts and progress.</p></div>';
     body='<div class="cc-rel-layout'+(S.openRelease?" has-detail":"")+'">'
       +'<div class="cc-rel-main">'+mainPane+'</div>'
@@ -1542,18 +1679,19 @@ function render(){
   else if(S.tab==="vault"){ body=vaultView(); }
   else if(S.tab==="more"){ body=moreView(); }
 
-  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Releases","layers"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["vault","Vault","vault"],["more","More","more"]];
+  var needAttn = releasesNeedingAttention();
+  var overdueRel = releasesOverdue();
+  var navItems=[["today","Today","clock"],["overdue","Overdue","alert"],["releases","Calendar","calendar"],["collabs","Collabs","users"],["plan","Plan","sparkles"],["vault","Vault","vault"],["more","More","more"]];
   var nav=""; navItems.forEach(function(t){
-    var badge = (t[0]==="overdue" && overduePosts.length) ? '<span class="cc-nav-badge">'+overduePosts.length+'</span>' : "";
+    var badge = (t[0]==="overdue" && overdueRel) ? '<span class="cc-nav-badge">'+overdueRel+'</span>' : "";
     nav+='<button class="cc-nav-btn'+(S.tab===t[0]?" on":"")+'" data-action="tab" data-tab="'+t[0]+'">'+ic(t[2],20)+'<span>'+t[1]+'</span>'+badge+'</button>';
   });
 
   var html='<header class="cc-header"><div><div class="cc-kicker">Private Posting Cockpit</div><h1 class="cc-h1">Creator Cockpit</h1></div>'
     +'<button class="cc-icon-btn" data-action="export">'+ic("download")+'</button></header>'
     +'<div class="cc-strip">'
-      +'<div class="cc-stat"><span class="cc-stat-n" style="color:'+(todayPosts.length?"var(--accent)":"var(--ok)")+'">'+todayPosts.length+'</span><span class="cc-stat-l">due today</span></div>'
-      +'<button class="cc-stat cc-stat-btn" data-action="tab" data-tab="overdue"><span class="cc-stat-n" style="color:'+(overduePosts.length?"var(--mut)":"var(--ok)")+'">'+overduePosts.length+'</span><span class="cc-stat-l">overdue</span></button>'
-      +'<div class="cc-stat"><span class="cc-stat-n">'+S.releases.length+'</span><span class="cc-stat-l">releases</span></div>'
+      +'<button class="cc-stat cc-stat-btn" data-action="tab" data-tab="overdue"><span class="cc-stat-n" style="color:'+(needAttn?"var(--accent)":"var(--ok)")+'">'+needAttn+'</span><span class="cc-stat-l">'+(needAttn===1?"release needs attention":"releases need attention")+'</span></button>'
+      +'<div class="cc-stat"><span class="cc-stat-n">'+S.releases.length+'</span><span class="cc-stat-l">'+(S.releases.length===1?"release":"releases")+'</span></div>'
       +'<button class="cc-add" data-action="add">'+ic("plus",16)+' Post</button>'
     +'</div>'
     +(S.access==="trial"?'<div class="cc-trial-banner">'+ic("clock",14)+' <span>Free trial — '+trialDaysLeft()+' left. <button class="cc-link-btn" data-action="subscribe-now">Subscribe</button> anytime to keep your data.</span></div>':"")
@@ -1562,6 +1700,8 @@ function render(){
     +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
     +collabEditorModal()
+    +vaultNewModal()
+    +collabStatusMenuModal()
     +statusMenuModal()
     +handoffModal()
     +tplEditorModal()
@@ -1601,11 +1741,30 @@ document.addEventListener("click",function(e){
   if(a==="tab"){ S.tab=el.getAttribute("data-tab"); if(S.tab==="releases")S.openRelease=null; render(); return; }
   if(a==="add"){ S.editing=blankPost(); render(); return; }
   if(a==="edit"){ var p=S.posts.filter(function(x){return x.id===id;})[0]; if(p){S.editing=Object.assign({},p);render();} return; }
+  if(a==="vault-new-open"){ resetVaultSel(); S.vaultNew=true; render(); return; }
+  if(a==="close-vault-new"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.vaultNew=false; render(); return; }
+  if(a==="vpill-plat"){ var vp=el.getAttribute("data-v"); var vi=vaultSel.platforms.indexOf(vp); if(vi>=0)vaultSel.platforms.splice(vi,1);else vaultSel.platforms.push(vp); el.classList.toggle("on"); return; }
+  if(a==="vpill-stage"){ var vs=el.getAttribute("data-v"); var vj=vaultSel.stages.indexOf(vs); if(vj>=0)vaultSel.stages.splice(vj,1);else vaultSel.stages.push(vs); el.classList.toggle("on"); return; }
+  if(a==="vault-new-save"){
+    var vn=($("v_name").value||"").trim();
+    if(!vn){ flash("Give the scene a name first."); return; }
+    if(!vaultSel.platforms.length){ flash("Select at least one platform."); return; }
+    if(!vaultSel.stages.length){ flash("Select at least one stage."); return; }
+    var vordered2=S.stages.filter(function(s){return vaultSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
+    var vex=($("v_excl")&&$("v_excl").value)||null;
+    addVault(vn, vaultSel.platforms.slice(), vordered2, vex);
+    S.vaultNew=false; render(); return;
+  }
+  if(a==="collabview"){ S.collabView=el.getAttribute("data-v"); render(); return; }
+  if(a==="collab-status-menu"){ S.collabStatusMenu=id; render(); return; }
+  if(a==="close-collab-status"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.collabStatusMenu=null; render(); return; }
+  if(a==="set-collab-status"){ setCollabStatus(id, el.getAttribute("data-status")); return; }
+  if(a==="toggle-past"){ S.showPast=!S.showPast; render(); return; }
   if(a==="status-menu"){ S.statusMenu=id; render(); return; }
   if(a==="close-status"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.statusMenu=null; render(); return; }
   if(a==="set-status"){ setStatus(id, el.getAttribute("data-status")); return; }
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
-  if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Proposed",notes:""}; render(); return; }
+  if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Tentative",notes:""}; render(); return; }
   if(a==="edit-collab"){ var ec=S.collabs.filter(function(x){return x.id===id;})[0]; if(ec){ S.collabEdit=Object.assign({},ec); render(); } return; }
   if(a==="close-collab"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.collabEdit=null; render(); return; }
   if(a==="save-collab"){ saveCollabFromForm(); return; }
