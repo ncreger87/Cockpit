@@ -297,6 +297,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-board-move:hover{background:var(--line);color:var(--accent);}
 .cc-board-move:active{transform:scale(.97);}
 .cc-board-empty{font-size:13px;color:var(--mut2);padding:10px 4px 4px;font-style:italic;}
+.cc-link-sep{color:var(--mut2);margin:0 7px;font-weight:400;}
 .cc-postnow svg{width:15px;height:15px;}
 
 /* status picker */
@@ -1248,7 +1249,7 @@ function planView(){
         +S.templates.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===S.activeTpl?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
         +'</select></label>'
       : "")
-    +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
+    +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button><span class="cc-link-sep">·</span><button class="cc-link-btn" data-action="tpl-new">Add template</button></span><div class="cc-wrap">'+stages+'</div></div>'
     +'<label class="cc-field"><span>Exclusive to a platform? <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="p_excl" class="cc-input"><option value="">Not exclusive</option>'+PLATFORMS.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.id)+' only</option>';}).join("")+'</select></label>'
     +'<button class="cc-primary" data-action="generate">'+ic("sparkles")+' Generate schedule</button>'
     +'<button class="cc-ghost full" data-action="vault-save" style="margin-top:10px">'+ic("layers")+' Save to Vault (no date yet)</button>'
@@ -1340,9 +1341,8 @@ function tplEditorModal(){
     +'<p class="cc-note" style="margin:0 0 14px">Each stage posts only to the platforms you pick for it. When you plan a release, the platform buttons there narrow this further for that one drop.</p>'
     +rows
     +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
-    +'<button class="cc-ghost full" data-action="tpl-reset" style="margin-bottom:14px">Reset to default (D7 · D3 · D1 · Release · Follow-Up)</button>'
     +'<div class="cc-two" style="margin-bottom:10px">'
-      +'<button class="cc-ghost" data-action="tpl-new">'+ic("plus",15)+' New template</button>'
+      +'<button class="cc-ghost" data-action="tpl-new">'+ic("plus",15)+' Add template</button>'
       +'<button class="cc-ghost" data-action="tpl-dup">'+ic("layers",15)+' Duplicate</button>'
     +'</div>'
     +(S.templates.length>1?'<button class="cc-ghost danger full" data-action="tpl-del" style="margin-bottom:10px">'+ic("trash",15)+' Delete this template</button>':"")
@@ -1999,7 +1999,6 @@ document.addEventListener("click",function(e){
   if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
   if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} render(); return; }
   if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} render(); return; }
-  if(a==="tpl-reset"){ S.tplEdit=cloneStages(DEFAULT_STAGES); render(); return; }
   if(a==="tpl-save"){
     syncTplFromDOM();
     var clean=S.tplEdit.filter(function(s){return (s.label||"").trim();});
@@ -2013,7 +2012,7 @@ document.addEventListener("click",function(e){
     S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
   if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); return; }
-  if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); flash("New template created."); render(); return; }
+  if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); flash("Template added — give it a name."); render(); return; }
   if(a==="tpl-dup"){
     syncTplFromDOM();
     var src=activeTemplate();
