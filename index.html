@@ -540,6 +540,7 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){retur
 function uid(){return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2);}
 function todayStr(){var d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
 function addDays(ds,n){var d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+function daysBetween(a,b){return Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/86400000);}
 function fmtDate(ds){if(!ds)return"No date";var d=new Date(ds+"T00:00:00");return isNaN(d)?ds:d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}
 function relDay(ds){if(!ds)return"";var diff=Math.round((new Date(ds+"T00:00:00")-new Date(todayStr()+"T00:00:00"))/86400000);if(diff===0)return"Today";if(diff===1)return"Tomorrow";if(diff===-1)return"Yesterday";if(diff<0)return(-diff)+"d overdue";return"in "+diff+"d";}
 function needsWork(p){return !p.assetReady||!p.captionReady||(p.status==="Idea"||p.status==="Draft");}
@@ -588,7 +589,8 @@ var S = {
   vault:[], vaultSchedule:null, handoff:null,
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
-  collabView:"list", collabStatusMenu:null
+  collabView:"list", collabStatusMenu:null,
+  templates:[], activeTpl:null, dupRelease:null
 };
 var TRIAL_DAYS = 7;
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
@@ -641,6 +643,8 @@ function fetchAll(){
       S.stages = cloneStages(DEFAULT_STAGES);
       saveTemplate(true);
     }
+    // named templates (falls back to wrapping the single template they already have)
+    loadTemplates(srow);
     // access / plan
     if(srow && srow.plan){ S.plan=srow.plan; S.trialEnds=srow.trial_ends||null; }
     else if(!setres || !setres.error){
@@ -678,9 +682,125 @@ function savePlan(silent){
     if(r.error){ if(!silent) sbErr(r.error); }
   });
 }
+/* ---------- named campaign templates ----------
+   S.stages always holds the ACTIVE template's stages, so every existing
+   feature keeps working untouched. S.templates is the named collection. */
+function normTplStages(arr){
+  return (arr||[]).map(function(s){
+    return {id:s.id||uid(), label:s.label, offset:Number(s.offset)||0,
+            platforms:Array.isArray(s.platforms)?s.platforms.slice():ALL_PLAT.slice()};
+  });
+}
+function loadTemplates(srow){
+  var t = srow && srow.templates;
+  var list = (t && Array.isArray(t.list)) ? t.list : null;
+  if(list && list.length){
+    S.templates = list.map(function(x){
+      return {id:x.id||uid(), name:x.name||"Untitled", stages:normTplStages(x.stages)};
+    });
+    var act = S.templates.filter(function(x){return x.id===(t.active);})[0] || S.templates[0];
+    S.activeTpl = act.id;
+    S.stages = cloneStages(act.stages);
+  } else {
+    // first run with named templates: wrap whatever single template they already have
+    var only = {id:uid(), name:"My template", stages:cloneStages(S.stages)};
+    S.templates = [only];
+    S.activeTpl = only.id;
+  }
+  resetPlanStages();
+}
+function activeTemplate(){
+  return S.templates.filter(function(t){return t.id===S.activeTpl;})[0] || S.templates[0] || null;
+}
+function syncActiveTemplateStages(){
+  var t = activeTemplate();
+  if(t) t.stages = cloneStages(S.stages);
+}
+function templatesPayload(){
+  return { active:S.activeTpl, list:S.templates.map(function(t){
+    return {id:t.id, name:t.name, stages:t.stages};
+  })};
+}
+function switchTemplate(id){
+  var t = S.templates.filter(function(x){return x.id===id;})[0];
+  if(!t) return;
+  S.activeTpl = id;
+  S.stages = cloneStages(t.stages);
+  resetPlanStages();
+  saveTemplate(true);
+  render();
+}
+function addTemplate(name, fromStages){
+  var t = {id:uid(), name:name||"New template", stages:cloneStages(fromStages||DEFAULT_STAGES)};
+  S.templates.push(t);
+  S.activeTpl = t.id;
+  S.stages = cloneStages(t.stages);
+  resetPlanStages();
+  saveTemplate(true);
+  return t;
+}
+function deleteTemplate(id){
+  if(S.templates.length<=1){ flash("You need at least one template."); return; }
+  S.templates = S.templates.filter(function(t){return t.id!==id;});
+  if(S.activeTpl===id){
+    S.activeTpl = S.templates[0].id;
+    S.stages = cloneStages(S.templates[0].stages);
+    resetPlanStages();
+  }
+  saveTemplate(true);
+  render();
+}
+
+/* ---------- duplication ---------- */
+function duplicatePost(id){
+  var p=S.posts.filter(function(x){return x.id===id;})[0]; if(!p)return;
+  var copy={
+    id:uid(), releaseId:p.releaseId||null,
+    title:p.title, stage:p.stage, platform:p.platform,
+    date:p.date, status:"Idea",
+    cta:p.cta, caption:p.caption, assetLink:p.assetLink,
+    results:"", assetReady:!!p.assetReady, captionReady:!!p.captionReady, winner:false
+  };
+  S.posts.push(copy);
+  S.editing=Object.assign({},copy,{_new:false});
+  render();
+  if(sb)sb.from("posts").insert([postToDb(copy)]).then(function(r){ if(r.error)sbErr(r.error); });
+  flash("Copied — edit the date and details.");
+}
+
+function duplicateRelease(id, newDate){
+  var r=S.releases.filter(function(x){return x.id===id;})[0]; if(!r)return;
+  var rp=S.posts.filter(function(p){return p.releaseId===id;});
+  if(!newDate){ flash("Pick a date."); return; }
+  var shift = daysBetween(r.date, newDate);
+  var nr={id:uid(), name:r.name+" (copy)", date:newDate,
+          platforms:(r.platforms||[]).slice(), exclusive:r.exclusive||null, createdAt:Date.now()};
+  var newPosts=rp.map(function(p){
+    return {id:uid(), releaseId:nr.id, title:p.title, stage:p.stage, platform:p.platform,
+            date:addDays(p.date, shift), status:"Idea",
+            cta:p.cta, caption:p.caption, assetLink:p.assetLink, results:"",
+            assetReady:!!p.assetReady, captionReady:!!p.captionReady, winner:false};
+  });
+  S.releases.push(nr);
+  S.posts=S.posts.concat(newPosts);
+  S.dupRelease=null;
+  S.openRelease=nr.id;
+  render();
+  if(sb){
+    sb.from("releases").insert(relToDb(nr)).then(function(r1){
+      if(r1.error){ sbErr(r1.error); return; }
+      if(newPosts.length){
+        sb.from("posts").insert(newPosts.map(postToDb)).then(function(r2){ if(r2.error)sbErr(r2.error); });
+      }
+    });
+  }
+  flash("Campaign duplicated — "+newPosts.length+" posts rescheduled.");
+}
+
 function saveTemplate(silent){
   if(!sb || !S.user){ return; }
-  sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, onboarded:S.onboarded, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){
+  syncActiveTemplateStages();
+  sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, templates:templatesPayload(), onboarded:S.onboarded, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){
     if(r.error){ if(!silent) sbErr(r.error); }
   });
 }
@@ -1109,6 +1229,7 @@ function releaseDetail(){
       +'<button class="cc-ghost" data-action="complete-scene" data-id="'+r.id+'">'+ic("check")+' Mark all posted</button>'
     +'</div>'
     +groups
+    +'<button class="cc-ghost full" data-action="dup-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("layers")+' Duplicate this campaign</button>'
     +'<button class="cc-ghost danger full" data-action="del-rel" data-id="'+r.id+'">'+ic("trash")+' Delete release</button>'
     +'</section>';
 }
@@ -1122,6 +1243,11 @@ function planView(){
     +'<label class="cc-field"><span>Release name</span><input id="p_name" class="cc-input" value="'+esc(S.planName||"")+'" placeholder="e.g. Spring photoset"></label>'
     +'<label class="cc-field"><span>Release date <span style="color:var(--mut2);font-weight:400">— optional for Vault</span></span><input id="p_date" type="date" class="cc-input" value="'+addDays(todayStr(),7)+'"></label>'
     +'<div class="cc-field"><span>Platforms <span style="color:var(--mut2);font-weight:400">— narrows this drop</span></span><div class="cc-wrap">'+plats+'</div></div>'
+    +(S.templates.length>1
+      ? '<label class="cc-field"><span>Template</span><select id="p_tpl" class="cc-input" data-action="pick-tpl">'
+        +S.templates.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===S.activeTpl?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
+        +'</select></label>'
+      : "")
     +'<div class="cc-field"><span>Campaign stages <button class="cc-link-btn" data-action="edit-tpl">Edit template</button></span><div class="cc-wrap">'+stages+'</div></div>'
     +'<label class="cc-field"><span>Exclusive to a platform? <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="p_excl" class="cc-input"><option value="">Not exclusive</option>'+PLATFORMS.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.id)+' only</option>';}).join("")+'</select></label>'
     +'<button class="cc-primary" data-action="generate">'+ic("sparkles")+' Generate schedule</button>'
@@ -1201,12 +1327,25 @@ function tplEditorModal(){
       +'</div>'
     +'</div>';
   });
+  var actT = activeTemplate();
+  var switcher = S.templates.length>1
+    ? '<label class="cc-field"><span>Editing template</span><select id="tpl_pick" class="cc-input" data-action="tpl-switch">'
+      +S.templates.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===S.activeTpl?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
+      +'</select></label>'
+    : "";
   return '<div class="cc-modal-bg" data-action="close-tpl"><div class="cc-modal" data-stop="1">'
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Campaign Template</h2><button class="cc-icon-btn" data-action="close-tpl">'+ic("x")+'</button></div>'
+    +switcher
+    +'<label class="cc-field"><span>Template name</span><input id="tpl_name" class="cc-input" value="'+esc(actT?actT.name:"My template")+'" placeholder="e.g. Solo drop"></label>'
     +'<p class="cc-note" style="margin:0 0 14px">Each stage posts only to the platforms you pick for it. When you plan a release, the platform buttons there narrow this further for that one drop.</p>'
     +rows
     +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
     +'<button class="cc-ghost full" data-action="tpl-reset" style="margin-bottom:14px">Reset to default (D7 · D3 · D1 · Release · Follow-Up)</button>'
+    +'<div class="cc-two" style="margin-bottom:10px">'
+      +'<button class="cc-ghost" data-action="tpl-new">'+ic("plus",15)+' New template</button>'
+      +'<button class="cc-ghost" data-action="tpl-dup">'+ic("layers",15)+' Duplicate</button>'
+    +'</div>'
+    +(S.templates.length>1?'<button class="cc-ghost danger full" data-action="tpl-del" style="margin-bottom:10px">'+ic("trash",15)+' Delete this template</button>':"")
     +'<button class="cc-primary" data-action="tpl-save">'+ic("check",16)+' Save template</button>'
     +'</div></div>';
 }
@@ -1232,6 +1371,17 @@ function vaultNewModal(){
     +'<div class="cc-field"><span>Campaign stages</span><div class="cc-wrap">'+stages+'</div></div>'
     +'<label class="cc-field"><span>Exclusive to a platform? <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="v_excl" class="cc-input"><option value="">Not exclusive</option>'+PLATFORMS.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.id)+' only</option>';}).join("")+'</select></label>'
     +'<button class="cc-primary" data-action="vault-new-save">'+ic("layers",16)+' Save to Vault</button>'
+    +'</div></div>';
+}
+function dupReleaseModal(){
+  if(!S.dupRelease)return"";
+  var r=S.releases.filter(function(x){return x.id===S.dupRelease;})[0]; if(!r)return"";
+  var n=S.posts.filter(function(p){return p.releaseId===r.id;}).length;
+  return '<div class="cc-modal-bg" data-action="close-duprel"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Duplicate campaign</h2><button class="cc-icon-btn" data-action="close-duprel">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Copies <b>'+esc(r.name)+'</b> and all '+n+' posts. Every date shifts to line up with the new release day. Captions come along; statuses reset.</p>'
+    +'<label class="cc-field"><span>New release date</span><input id="dr_date" type="date" class="cc-input" value="'+addDays(todayStr(),14)+'"></label>'
+    +'<button class="cc-primary" data-action="do-dup-rel" data-id="'+r.id+'">'+ic("layers",16)+' Duplicate campaign</button>'
     +'</div></div>';
 }
 function collabStatusMenuModal(){
@@ -1318,6 +1468,7 @@ function editorModal(){
       +'<div id="f_winner" class="cc-check'+(p.winner?" on":"")+'" data-action="chk">'+(p.winner?ic("star",13):"")+' Winner</div>'
     +'</div>'
     +'<div class="cc-modal-actions">'
+      +(isNew?"":'<button class="cc-ghost" data-action="dup-post" data-id="'+esc(p.id)+'">'+ic("layers")+' Duplicate</button>')
       +(isNew?"":'<button class="cc-ghost danger" data-action="del-post" data-id="'+esc(p.id)+'">'+ic("trash")+' Delete</button>')
       +'<button class="cc-primary" data-action="save-post" style="flex:1">'+ic("check",16)+' Save</button>'
     +'</div></div></div>';
@@ -1416,7 +1567,7 @@ function finishWizard(){
   if(!stages.length){ stages=cloneStages(DEFAULT_STAGES); }
   S.stages=stages; resetPlanStages();
   S.wiz=null; S.wizOpen=false; S.onboarded=true; render();
-  if(sb && S.user){ sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, onboarded:true, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){ if(r.error)sbErr(r.error); }); }
+  if(sb && S.user){ sb.from("settings").upsert({user_id:S.user.id, stages:S.stages, templates:templatesPayload(), onboarded:true, updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){ if(r.error)sbErr(r.error); }); }
   flash("Your campaign template is ready — edit it anytime under More.");
 }
 
@@ -1701,6 +1852,7 @@ function render(){
     +editorModal()
     +collabEditorModal()
     +vaultNewModal()
+    +dupReleaseModal()
     +collabStatusMenuModal()
     +statusMenuModal()
     +handoffModal()
@@ -1831,7 +1983,7 @@ document.addEventListener("click",function(e){
   if(a==="wiz-back"){ if(S.wiz.step>0)S.wiz.step--; render(); return; }
   if(a==="wiz-skip"){
     S.wiz=null; S.wizOpen=false;
-    if(!S.onboarded){ S.stages=cloneStages(DEFAULT_STAGES); resetPlanStages(); S.onboarded=true; if(sb&&S.user){sb.from("settings").upsert({user_id:S.user.id,stages:S.stages,onboarded:true,updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){if(r.error)sbErr(r.error);});} }
+    if(!S.onboarded){ S.stages=cloneStages(DEFAULT_STAGES); resetPlanStages(); S.onboarded=true; if(sb&&S.user){sb.from("settings").upsert({user_id:S.user.id,stages:S.stages,templates:templatesPayload(),onboarded:true,updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){if(r.error)sbErr(r.error);});} }
     render(); return;
   }
   if(a==="wiz-done"){ finishWizard(); return; }
@@ -1855,8 +2007,31 @@ document.addEventListener("click",function(e){
     var noPlat=clean.filter(function(s){return !(s.platforms&&s.platforms.length);});
     if(noPlat.length){ flash('"'+noPlat[0].label.trim()+'" has no platforms selected — pick at least one or remove the stage.'); return; }
     clean.forEach(function(s){ s.label=s.label.trim(); if(!s.id)s.id=uid(); });
-    S.stages=clean; S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
+    S.stages=clean;
+    var actT=activeTemplate();
+    if(actT){ var nm=($("tpl_name")&&$("tpl_name").value||"").trim(); actT.name = nm || actT.name; }
+    S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
+  if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); return; }
+  if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); flash("New template created."); render(); return; }
+  if(a==="tpl-dup"){
+    syncTplFromDOM();
+    var src=activeTemplate();
+    addTemplate((src?src.name:"Template")+" (copy)", S.tplEdit);
+    S.tplEdit=cloneStages(S.stages); flash("Template duplicated."); render(); return;
+  }
+  if(a==="tpl-del"){
+    var delId=S.activeTpl;
+    ask("Delete this template? Releases you already made are unaffected.",function(){
+      deleteTemplate(delId); S.tplEdit=cloneStages(S.stages); render();
+    },"Delete");
+    return;
+  }
+  if(a==="pick-tpl"){ switchTemplate(el.value); return; }
+  if(a==="dup-post"){ duplicatePost(id); return; }
+  if(a==="dup-rel"){ S.dupRelease=id; render(); return; }
+  if(a==="close-duprel"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.dupRelease=null; render(); return; }
+  if(a==="do-dup-rel"){ var dd=$("dr_date").value; if(!dd){ flash("Pick a date."); return; } duplicateRelease(id, dd); return; }
   if(a==="export"){ exportJSON(); return; }
   if(a==="clear"){ ask("Clear ALL releases and posts from the cloud? This can't be undone.",function(){clearAll();},"Clear all"); return; }
   if(a==="confirm-cancel"){ if(el.classList.contains("cc-confirm-bg") && e.target!==el) return; S.confirm=null; render(); return; }
@@ -1878,6 +2053,8 @@ document.addEventListener("change",function(e){
   if(a==="filter-plat"){ S.qPlat=el.value; render(); }
   else if(a==="filter-status"){ S.qStatus=el.value; render(); }
   else if(a==="tpl-dir"){ syncTplFromDOM(); render(); }
+  else if(a==="pick-tpl"){ switchTemplate(el.value); }
+  else if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); }
 });
 
 $("importFile").addEventListener("change",function(e){ e.target.value=""; });
