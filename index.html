@@ -7,6 +7,22 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0c10">
 <title>Creator Cockpit</title>
+<meta name="description" content="Plan one release and get the whole promo campaign — teasers, pre-sales, release day, follow-ups — scheduled across every platform you post on.">
+<link rel="canonical" href="https://ncreger87.github.io/Cockpit/">
+<!-- link preview (iMessage, X, Reddit, Discord, etc.) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Creator Cockpit">
+<meta property="og:title" content="Creator Cockpit — Plan once. Post everywhere.">
+<meta property="og:description" content="One release becomes a full multi-platform campaign — built, scheduled, and waiting.">
+<meta property="og:url" content="https://ncreger87.github.io/Cockpit/">
+<meta property="og:image" content="https://ncreger87.github.io/Cockpit/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Creator Cockpit — a scheduling cockpit for content creators">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Creator Cockpit — Plan once. Post everywhere.">
+<meta name="twitter:description" content="One release becomes a full multi-platform campaign — built, scheduled, and waiting.">
+<meta name="twitter:image" content="https://ncreger87.github.io/Cockpit/preview.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -297,6 +313,9 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-board-move:hover{background:var(--line);color:var(--accent);}
 .cc-board-move:active{transform:scale(.97);}
 .cc-board-empty{font-size:13px;color:var(--mut2);padding:10px 4px 4px;font-style:italic;}
+.cc-cap-count{font-size:11px;font-weight:600;color:var(--mut2);margin-left:8px;}
+.cc-cap-count.near{color:var(--accent);}
+.cc-cap-count.over{color:#e2725b;}
 .cc-link-sep{color:var(--mut2);margin:0 7px;font-weight:400;}
 .cc-postnow svg{width:15px;height:15px;}
 
@@ -476,6 +495,8 @@ var PLATFORMS = [
   {id:"X",group:"micro"},{id:"Bluesky",group:"micro"},
   {id:"Reddit",group:"reddit"},{id:"Instagram",group:"social"},{id:"TikTok",group:"social"}
 ];
+/* Soft caption limits per platform (chars). Guidance, not enforced. */
+var PLATFORM_LIMIT = { X:280, Bluesky:300, Instagram:2200, TikTok:2200, Reddit:40000, OnlyFans:0, JustForFans:0 };
 var PLATFORM_URL = {
   OnlyFans:"https://onlyfans.com/",
   JustForFans:"https://justfor.fans/",
@@ -591,9 +612,10 @@ var S = {
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
   collabView:"list", collabStatusMenu:null,
-  templates:[], activeTpl:null, dupRelease:null
+  templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null
 };
 var TRIAL_DAYS = 7;
+var APP_VERSION = "v40";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -657,6 +679,10 @@ function fetchAll(){
     // show intro the first time (onboarded flag absent/false)
     if(srow && srow.onboarded){ S.onboarded=true; }
     else { S.onboarded=false; S.wizOpen=true; }
+    // Brand-new account with nothing in it? Drop in one labeled example so the app isn't empty.
+    if(!srow && !S.releases.length && !S.posts.length){
+      seedExampleRelease();
+    }
     resetPlanStages();
     render();
   }).catch(function(e){ sbErr(e); });
@@ -798,6 +824,61 @@ function duplicateRelease(id, newDate){
   flash("Campaign duplicated — "+newPosts.length+" posts rescheduled.");
 }
 
+function updateCapCount(){
+  var t=$("f_caption"), c=$("f_cap_count"), ps=$("f_platform");
+  if(!t||!c)return;
+  var plat=ps?ps.value:"", limit=PLATFORM_LIMIT[plat]||0, n=(t.value||"").length;
+  if(!limit){ c.textContent=n+" chars"; c.className="cc-cap-count"; return; }
+  var left=limit-n;
+  c.textContent=n+" / "+limit;
+  c.className="cc-cap-count"+(left<0?" over":(left<=20?" near":""));
+}
+function copyReleaseCaptions(id){
+  var r=S.releases.filter(function(x){return x.id===id;})[0]; if(!r)return;
+  var rp=S.posts.filter(function(p){return p.releaseId===id && (p.caption||"").trim();}).sort(byDate);
+  if(!rp.length){ flash("No captions written for this release yet."); return; }
+  var out=rp.map(function(p){
+    return "— "+(p.stage||"Post")+" · "+p.platform+" · "+fmtDate(p.date)+" —\n"+p.caption.trim();
+  }).join("\n\n");
+  if(copyText(out)){ flash("Copied "+rp.length+" captions for "+r.name+"."); }
+  else { flash("Couldn't copy automatically."); }
+}
+function rescheduleRelease(id, newReleaseDate){
+  var r=S.releases.filter(function(x){return x.id===id;})[0]; if(!r)return;
+  if(!newReleaseDate){ flash("Pick a date."); return; }
+  var shift=daysBetween(r.date, newReleaseDate);
+  if(shift===0){ S.rescheduleRel=null; render(); return; }
+  r.date=newReleaseDate;
+  var moved=S.posts.filter(function(p){return p.releaseId===id;});
+  moved.forEach(function(p){ p.date=addDays(p.date, shift); });
+  S.rescheduleRel=null;
+  render();
+  if(sb){
+    sb.from("releases").update({release_date:r.date}).eq("id",id).then(function(x){ if(x.error)sbErr(x.error); });
+    moved.forEach(function(p){ sb.from("posts").update({post_date:p.date}).eq("id",p.id).then(function(x){ if(x.error)sbErr(x.error); }); });
+  }
+  flash("Whole campaign shifted "+(shift>0?"+":"")+shift+" days.");
+}
+function duplicateCollab(id){
+  var c=S.collabs.filter(function(x){return x.id===id;})[0]; if(!c)return;
+  var copy={id:uid(), partner:c.partner, date:c.date, time:c.time||"",
+            location:c.location||"", status:"Tentative", notes:c.notes||""};
+  S.collabs.push(copy);
+  S.collabEdit=Object.assign({},copy);
+  render();
+  if(sb)sb.from("collabs").insert([collabToDb(copy)]).then(function(r){ if(r.error)sbErr(r.error); });
+  flash("Collab copied — adjust the date.");
+}
+function seedExampleRelease(){
+  // A clearly-labeled sample so a new user sees what a finished campaign looks like.
+  try{
+    generate("👋 Example release — tap to explore, then delete",
+             addDays(todayStr(),10),
+             ["OnlyFans","X"],
+             S.stages.map(function(s){return s.id;}),
+             null);
+  }catch(e){}
+}
 function saveTemplate(silent){
   if(!sb || !S.user){ return; }
   syncActiveTemplateStages();
@@ -1129,6 +1210,7 @@ function collabEditorModal(){
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="c_notes" class="cc-input" rows="3" placeholder="Ideas, who brings what, split of content…">'+esc(c.notes||"")+'</textarea></label>'
     +'<button class="cc-primary" data-action="save-collab">'+ic("check",16)+' Save collab</button>'
     +(!isNew?'<button class="cc-ghost full" data-action="collab-to-release" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("sparkles",16)+' Turn into a release</button>'
+      +'<button class="cc-ghost full" data-action="dup-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("layers",16)+' Duplicate collab</button>'
       +'<button class="cc-ghost danger full" data-action="del-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete collab</button>':"")
     +'</div></div>';
 }
@@ -1230,6 +1312,8 @@ function releaseDetail(){
       +'<button class="cc-ghost" data-action="complete-scene" data-id="'+r.id+'">'+ic("check")+' Mark all posted</button>'
     +'</div>'
     +groups
+    +'<button class="cc-ghost full" data-action="copy-captions" data-id="'+r.id+'" style="margin-top:10px">'+ic("copy")+' Copy all captions</button>'
+    +'<button class="cc-ghost full" data-action="reschedule-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("clock")+' Shift all dates</button>'
     +'<button class="cc-ghost full" data-action="dup-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("layers")+' Duplicate this campaign</button>'
     +'<button class="cc-ghost danger full" data-action="del-rel" data-id="'+r.id+'">'+ic("trash")+' Delete release</button>'
     +'</section>';
@@ -1277,11 +1361,11 @@ function vaultView(){
 
 function moreView(){
   var winners=S.posts.filter(function(p){return p.winner;}).sort(byDate);
-  var winHTML=""; if(winners.length){winners.forEach(function(p){winHTML+=postCard(p);});}else{winHTML=empty("star","Mark a post as a winner to reuse it later.");}
+  var winHTML=""; if(winners.length){winners.forEach(function(p){winHTML+=postCard(p);});}else{winHTML=empty("star","Star a post as a winner to keep your best ones here. Open any winner and tap <b>Duplicate</b> to reuse it.");}
   var email = S.user && S.user.email ? S.user.email : "Signed in";
   var tplRows=""; S.stages.forEach(function(s){ var pl=(s.platforms||[]).join(", ")||"no platforms"; tplRows+='<div class="cc-tpl-line"><div style="flex:1;min-width:0"><span class="cc-stage">'+esc(s.label)+'</span> <em>'+esc(stageTiming(s.offset))+'</em><div class="cc-tpl-platnote">'+esc(pl)+'</div></div></div>'; });
   return '<section class="cc-section"><h2 class="cc-h2">More</h2><p class="cc-sub">Account, campaign template, triage and backups.</p>'
-    +'<div class="cc-account"><div style="flex:1;min-width:0"><div class="em">'+esc(email)+'</div><div class="sync">● Synced to the cloud</div></div>'
+    +'<div class="cc-account"><div style="flex:1;min-width:0"><div class="em">'+esc(email)+'</div><div class="sync">● Synced to the cloud <span style="color:var(--mut2)">· '+APP_VERSION+'</span></div></div>'
       +'<button class="cc-ghost" data-action="signout">'+ic("logout")+' Sign out</button></div>'
     +'<h3 class="cc-sub-h">'+(S.templates.length>1 ? esc(activeTemplate()?activeTemplate().name:"My Campaign Template") : "My Campaign Template")+'</h3>'
     +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release. Edit them to match how you run a drip — rename, change timing, add or remove steps.'
@@ -1375,6 +1459,17 @@ function vaultNewModal(){
     +'<button class="cc-primary" data-action="vault-new-save">'+ic("layers",16)+' Save to Vault</button>'
     +'</div></div>';
 }
+function rescheduleModal(){
+  if(!S.rescheduleRel)return"";
+  var r=S.releases.filter(function(x){return x.id===S.rescheduleRel;})[0]; if(!r)return"";
+  var n=S.posts.filter(function(p){return p.releaseId===r.id;}).length;
+  return '<div class="cc-modal-bg" data-action="close-reschedule"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Shift all dates</h2><button class="cc-icon-btn" data-action="close-reschedule">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Move <b>'+esc(r.name)+'</b> to a new release day. All '+n+' posts shift by the same amount, keeping their spacing.</p>'
+    +'<label class="cc-field"><span>New release date</span><input id="rs_date" type="date" class="cc-input" value="'+esc(r.date)+'"></label>'
+    +'<button class="cc-primary" data-action="do-reschedule" data-id="'+r.id+'">'+ic("clock",16)+' Shift the campaign</button>'
+    +'</div></div>';
+}
 function dupReleaseModal(){
   if(!S.dupRelease)return"";
   var r=S.releases.filter(function(x){return x.id===S.dupRelease;})[0]; if(!r)return"";
@@ -1461,7 +1556,7 @@ function editorModal(){
     +'<div class="cc-two"><label class="cc-field"><span>Status</span>'+sel("f_status",p.status,STATUS_ORDER)+'</label>'
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
     +'<input type="hidden" id="f_stage" value="'+esc(p.stage||"Promo")+'">'
-    +'<label class="cc-field"><span>Caption</span><textarea id="f_caption" class="cc-input" rows="4" placeholder="Write your caption…">'+esc(p.caption||"")+'</textarea></label>'
+    +'<label class="cc-field"><span>Caption <span id="f_cap_count" class="cc-cap-count"></span></span><textarea id="f_caption" class="cc-input" rows="4" placeholder="Write your caption…" data-action="cap-count">'+esc(p.caption||"")+'</textarea></label>'
     +'<label class="cc-field"><span>Asset link</span><input id="f_asset" class="cc-input" value="'+esc(p.assetLink||"")+'" placeholder="Paste a share link (iCloud, Drive, Dropbox…)"></label>'
     +'<label class="cc-field"><span>Result notes</span><textarea id="f_results" class="cc-input" rows="2">'+esc(p.results||"")+'</textarea></label>'
     +'<div class="cc-checks">'
@@ -1820,7 +1915,7 @@ function render(){
         mainInner+='<button class="cc-ghost full" data-action="toggle-past" style="margin-top:12px">'
           +(S.showPast?ic("chevR",15)+' Hide past releases':ic("clock",15)+' Show past releases ('+past.length+')')+'</button>';
       }
-    } else { mainInner+=empty("rocket","No releases yet. Tap <b>Plan</b> to build your first one."); }
+    } else { mainInner+=empty("rocket","Nothing here yet. Head to <b>Plan</b> to build your first campaign — or tap <b>Load example release</b> there to see how a finished one looks."); }
     var mainPane='<section class="cc-section"><h2 class="cc-h2">Calendar</h2><p class="cc-sub">Your releases and collabs by date. Tap any item to open it.</p>'+mainInner+'</section>';
     var detailPane = S.openRelease ? releaseDetail() : '<div class="cc-rel-placeholder">'+ic("layers",34)+'<p>Select a release to see its posts and progress.</p></div>';
     body='<div class="cc-rel-layout'+(S.openRelease?" has-detail":"")+'">'
@@ -1855,6 +1950,7 @@ function render(){
     +collabEditorModal()
     +vaultNewModal()
     +dupReleaseModal()
+    +rescheduleModal()
     +collabStatusMenuModal()
     +statusMenuModal()
     +handoffModal()
@@ -1864,6 +1960,7 @@ function render(){
     +confirmModal()
     +introOverlay();
   $("app").innerHTML=html;
+  if(S.editing){ try{ updateCapCount(); }catch(e){} }
 }
 
 /* ====================== EVENTS ====================== */
@@ -2031,6 +2128,11 @@ document.addEventListener("click",function(e){
   if(a==="pick-tpl"){ switchTemplate(el.value); return; }
   if(a==="dup-post"){ duplicatePost(id); return; }
   if(a==="dup-rel"){ S.dupRelease=id; render(); return; }
+  if(a==="copy-captions"){ copyReleaseCaptions(id); return; }
+  if(a==="reschedule-rel"){ S.rescheduleRel=id; render(); return; }
+  if(a==="close-reschedule"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.rescheduleRel=null; render(); return; }
+  if(a==="do-reschedule"){ var rd=$("rs_date").value; if(!rd){ flash("Pick a date."); return; } rescheduleRelease(id, rd); return; }
+  if(a==="dup-collab"){ duplicateCollab(id); return; }
   if(a==="close-duprel"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.dupRelease=null; render(); return; }
   if(a==="do-dup-rel"){ var dd=$("dr_date").value; if(!dd){ flash("Pick a date."); return; } duplicateRelease(id, dd); return; }
   if(a==="export"){ exportJSON(); return; }
@@ -2056,6 +2158,11 @@ document.addEventListener("change",function(e){
   else if(a==="tpl-dir"){ syncTplFromDOM(); render(); }
   else if(a==="pick-tpl"){ switchTemplate(el.value); }
   else if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); }
+  else if(el.id==="f_platform"){ updateCapCount(); }
+});
+document.addEventListener("input",function(e){
+  var el=e.target;
+  if(el && el.id==="f_caption"){ updateCapCount(); }
 });
 
 $("importFile").addEventListener("change",function(e){ e.target.value=""; });
