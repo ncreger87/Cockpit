@@ -612,10 +612,10 @@ var S = {
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
   collabView:"list", collabStatusMenu:null,
-  templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null
+  templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v40";
+var APP_VERSION = "v41";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1415,13 +1415,13 @@ function tplEditorModal(){
     +'</div>';
   });
   var actT = activeTemplate();
-  var switcher = S.templates.length>1
+  var switcher = (S.templates.length>1 && !S.tplJustAdded)
     ? '<label class="cc-field"><span>Editing template</span><select id="tpl_pick" class="cc-input" data-action="tpl-switch">'
       +S.templates.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===S.activeTpl?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
       +'</select></label>'
     : "";
   return '<div class="cc-modal-bg" data-action="close-tpl"><div class="cc-modal" data-stop="1">'
-    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Campaign Template</h2><button class="cc-icon-btn" data-action="close-tpl">'+ic("x")+'</button></div>'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+(S.tplJustAdded?"New Template":"Campaign Template")+'</h2><button class="cc-icon-btn" data-action="close-tpl">'+ic("x")+'</button></div>'
     +switcher
     +'<label class="cc-field"><span>Template name</span><input id="tpl_name" class="cc-input" value="'+esc(actT?actT.name:"My template")+'" placeholder="e.g. Solo drop"></label>'
     +'<p class="cc-note" style="margin:0 0 14px">Each stage posts only to the platforms you pick for it. When you plan a release, the platform buttons there narrow this further for that one drop.</p>'
@@ -2092,7 +2092,7 @@ document.addEventListener("click",function(e){
   if(a==="wiz-plat"){ var tt4=S.wiz.types[S.wiz.step-1]; var ans2=S.wiz.answers[tt4.key]; var pv2=el.getAttribute("data-v"); var ix2=ans2.platforms.indexOf(pv2); if(ix2>=0)ans2.platforms.splice(ix2,1); else ans2.platforms.push(pv2); render(); return; }
   if(a==="launch-wizard"){ ask("Run the guided setup? It rebuilds your campaign template from your answers. Your existing releases and posts stay exactly as they are.",function(){ initWizard(); S.wizOpen=true; render(); },"Run setup"); return; }
   if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
-  if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; render(); return; }
+  if(a==="close-tpl"){ S.tplJustAdded=false; if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; render(); return; }
   if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); render(); return; }
   if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } render(); return; }
   if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
@@ -2108,15 +2108,15 @@ document.addEventListener("click",function(e){
     S.stages=clean;
     var actT=activeTemplate();
     if(actT){ var nm=($("tpl_name")&&$("tpl_name").value||"").trim(); actT.name = nm || actT.name; }
-    S.tplEdit=null; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
+    S.tplEdit=null; S.tplJustAdded=false; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
-  if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); return; }
-  if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); flash("Template added — give it a name."); render(); return; }
+  if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); S.tplJustAdded=false; render(); return; }
+  if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); S.tplJustAdded=true; flash("Template added — give it a name."); render(); return; }
   if(a==="tpl-dup"){
     syncTplFromDOM();
     var src=activeTemplate();
     addTemplate((src?src.name:"Template")+" (copy)", S.tplEdit);
-    S.tplEdit=cloneStages(S.stages); flash("Template duplicated."); render(); return;
+    S.tplEdit=cloneStages(S.stages); S.tplJustAdded=true; flash("Template duplicated."); render(); return;
   }
   if(a==="tpl-del"){
     var delId=S.activeTpl;
@@ -2143,6 +2143,11 @@ document.addEventListener("click",function(e){
 
 function syncTplFromDOM(){
   if(!S.tplEdit)return;
+  var nameEl=$("tpl_name");
+  if(nameEl){
+    var t=activeTemplate();
+    if(t && nameEl.value.trim()) t.name=nameEl.value.trim();
+  }
   S.tplEdit.forEach(function(s,i){
     var le=$("tpl_label_"+i), ne=$("tpl_num_"+i), de=$("tpl_dir_"+i);
     if(le)s.label=le.value;
@@ -2163,6 +2168,10 @@ document.addEventListener("change",function(e){
 document.addEventListener("input",function(e){
   var el=e.target;
   if(el && el.id==="f_caption"){ updateCapCount(); }
+  if(el && el.id==="tpl_name"){
+    var t=activeTemplate();
+    if(t && el.value.trim()) t.name=el.value.trim();
+  }
 });
 
 $("importFile").addEventListener("change",function(e){ e.target.value=""; });
