@@ -624,7 +624,7 @@ var S = {
   templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v44";
+var APP_VERSION = "v45";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1413,7 +1413,17 @@ function moreView(){
 
 function repaintTplRows(){
   var tr=$("tplRows");
-  if(tr){ tr.innerHTML=tplRowsHTML(); } else { render(); }
+  if(!tr){ render(); return; }
+  tr.innerHTML=tplRowsHTML();
+  // iOS leaves scroll stranded when content shrinks — clamp it back into range
+  try{
+    var m=document.querySelector(".cc-modal");
+    if(m){
+      var clamp=function(){ var max=Math.max(0, m.scrollHeight - m.clientHeight); if(m.scrollTop>max) m.scrollTop=max; };
+      clamp();
+      if(window.requestAnimationFrame) requestAnimationFrame(clamp);
+    }
+  }catch(e){}
 }
 function tplRowsHTML(){
   var rows="";
@@ -2154,7 +2164,10 @@ document.addEventListener("click",function(e){
   if(a==="tpl-del"){
     var delId=S.activeTpl;
     ask("Delete this template? Releases you already made are unaffected.",function(){
-      deleteTemplate(delId); S.tplEdit=cloneStages(S.stages); render();
+      deleteTemplate(delId);
+      S.tplEdit=null; S.tplJustAdded=false; S.tab="more";
+      render();
+      flash("Template deleted.");
     },"Delete");
     return;
   }
