@@ -313,6 +313,14 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-board-move:hover{background:var(--line);color:var(--accent);}
 .cc-board-move:active{transform:scale(.97);}
 .cc-board-empty{font-size:13px;color:var(--mut2);padding:10px 4px 4px;font-style:italic;}
+.cc-tpl-pickrow{display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--txt);transition:.15s;text-align:left;}
+.cc-tpl-pickrow.on{border-color:var(--accent);background:rgba(242,166,90,.07);}
+.cc-tpl-pickname{font-family:var(--serif);font-size:15.5px;font-weight:700;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cc-tpl-pickmeta{font-size:12px;color:var(--mut);}
+.cc-tpl-pickbadge{font-size:10.5px;font-weight:700;color:var(--accent);border:1px solid var(--accent);
+  border-radius:999px;padding:2px 9px;letter-spacing:.04em;}
 .cc-cap-count{font-size:11px;font-weight:600;color:var(--mut2);margin-left:8px;}
 .cc-cap-count.near{color:var(--accent);}
 .cc-cap-count.over{color:#e2725b;}
@@ -616,7 +624,7 @@ var S = {
   templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v43";
+var APP_VERSION = "v44";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1373,9 +1381,19 @@ function moreView(){
   return '<section class="cc-section"><h2 class="cc-h2">More</h2><p class="cc-sub">Account, campaign template, triage and backups.</p>'
     +'<div class="cc-account"><div style="flex:1;min-width:0"><div class="em">'+esc(email)+'</div><div class="sync">● Synced to the cloud <span style="color:var(--mut2)">· '+APP_VERSION+'</span></div></div>'
       +'<button class="cc-ghost" data-action="signout">'+ic("logout")+' Sign out</button></div>'
-    +'<h3 class="cc-sub-h">'+(S.templates.length>1 ? esc(activeTemplate()?activeTemplate().name:"My Campaign Template") : "My Campaign Template")+'</h3>'
-    +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release. Edit them to match how you run a drip — rename, change timing, add or remove steps.'
-      +(S.templates.length>1?' You have '+S.templates.length+' templates — pick which one to use when you plan a release.':"")+'</p>'
+    +'<h3 class="cc-sub-h">My Campaign Template'+(S.templates.length>1?"s ("+S.templates.length+")":"")+'</h3>'
+    +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release.'
+      +(S.templates.length>1?' All your templates are listed below — tap one to make it active. The active one is what Plan uses.':' Edit them to match how you run a drip — rename, change timing, add or remove steps.')+'</p>'
+    +(S.templates.length>1
+      ? S.templates.map(function(t){
+          var on=(t.id===S.activeTpl);
+          return '<button class="cc-tpl-pickrow'+(on?" on":"")+'" data-action="tpl-activate" data-id="'+esc(t.id)+'">'
+            +'<span class="cc-tpl-pickname">'+esc(t.name)+'</span>'
+            +'<span class="cc-tpl-pickmeta">'+t.stages.length+' stage'+(t.stages.length===1?"":"s")+'</span>'
+            +(on?'<span class="cc-tpl-pickbadge">Active</span>':"")
+            +'</button>';
+        }).join("")
+      : "")
     +'<div class="cc-tpl-box">'+tplRows+'</div>'
     +'<button class="cc-primary" style="margin-top:12px" data-action="launch-wizard">'+ic("rocket",16)+' Set up my campaign (guided)</button>'
     +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-tpl">'+ic("sparkles")+' Edit campaign template</button>'
@@ -1393,8 +1411,11 @@ function moreView(){
     +'</section>';
 }
 
-function tplEditorModal(){
-  if(!S.tplEdit)return"";
+function repaintTplRows(){
+  var tr=$("tplRows");
+  if(tr){ tr.innerHTML=tplRowsHTML(); } else { render(); }
+}
+function tplRowsHTML(){
   var rows="";
   S.tplEdit.forEach(function(s,i){
     var dir = s.offset<0?"before":(s.offset>0?"after":"release");
@@ -1420,6 +1441,11 @@ function tplEditorModal(){
       +'</div>'
     +'</div>';
   });
+  return rows;
+}
+function tplEditorModal(){
+  if(!S.tplEdit)return"";
+  var rows=tplRowsHTML();
   var actT = activeTemplate();
   var switcher = (S.templates.length>1 && !S.tplJustAdded)
     ? '<label class="cc-field"><span>Editing template</span><select id="tpl_pick" class="cc-input" data-action="tpl-switch">'
@@ -1431,7 +1457,7 @@ function tplEditorModal(){
     +switcher
     +'<label class="cc-field"><span>Template name</span><input id="tpl_name" class="cc-input" value="'+esc(actT?actT.name:"My template")+'" placeholder="e.g. Solo drop"></label>'
     +'<p class="cc-note" style="margin:0 0 14px">Each stage posts only to the platforms you pick for it. When you plan a release, the platform buttons there narrow this further for that one drop.</p>'
-    +rows
+    +'<div id="tplRows">'+rows+'</div>'
     +'<button class="cc-ghost full" data-action="tpl-add" style="margin:4px 0 6px">'+ic("plus")+' Add stage</button>'
     +'<div class="cc-two" style="margin-bottom:10px">'
       +'<button class="cc-ghost" data-action="tpl-new">'+ic("plus",15)+' Add template</button>'
@@ -1942,7 +1968,7 @@ function render(){
   });
 
   var html='<header class="cc-header"><div><div class="cc-kicker">Private Posting Cockpit</div><h1 class="cc-h1">Creator Cockpit</h1></div>'
-    +'<button class="cc-icon-btn" data-action="export">'+ic("download")+'</button></header>'
+    +'</header>'
     +'<div class="cc-strip">'
       +'<button class="cc-stat cc-stat-btn" data-action="tab" data-tab="overdue"><span class="cc-stat-n" style="color:'+(needAttn?"var(--accent)":"var(--ok)")+'">'+needAttn+'</span><span class="cc-stat-l">'+(needAttn===1?"release needs attention":"releases need attention")+'</span></button>'
       +'<div class="cc-stat"><span class="cc-stat-n">'+S.releases.length+'</span><span class="cc-stat-l">'+(S.releases.length===1?"release":"releases")+'</span></div>'
@@ -2101,11 +2127,11 @@ document.addEventListener("click",function(e){
   if(a==="launch-wizard"){ ask("Run the guided setup? It rebuilds your campaign template from your answers. Your existing releases and posts stay exactly as they are.",function(){ initWizard(); S.wizOpen=true; render(); },"Run setup"); return; }
   if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
   if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; S.tplJustAdded=false; render(); return; }
-  if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); render(); return; }
+  if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); repaintTplRows(); return; }
   if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } el.classList.toggle("on"); return; }
-  if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
-  if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} render(); return; }
-  if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} render(); return; }
+  if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); repaintTplRows(); return; }
+  if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} repaintTplRows(); return; }
+  if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} repaintTplRows(); return; }
   if(a==="tpl-save"){
     syncTplFromDOM();
     var clean=S.tplEdit.filter(function(s){return (s.label||"").trim();});
@@ -2132,6 +2158,7 @@ document.addEventListener("click",function(e){
     },"Delete");
     return;
   }
+  if(a==="tpl-activate"){ switchTemplate(id); return; }
   if(a==="dup-post"){ duplicatePost(id); return; }
   if(a==="dup-rel"){ S.dupRelease=id; render(); return; }
   if(a==="copy-captions"){ copyReleaseCaptions(id); return; }
