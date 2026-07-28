@@ -447,6 +447,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 </head>
 <body>
 <div id="app"></div>
+<div id="toast" class="cc-toast" style="display:none"></div>
 <input id="importFile" type="file" accept="application/json" style="display:none">
 
 <script>
@@ -615,7 +616,7 @@ var S = {
   templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v42";
+var APP_VERSION = "v43";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -626,7 +627,12 @@ function resetPlanStages(){ planSel.stages = S.stages.map(function(s){return s.i
 /* Separate selection state for the "Add to Vault" form so it never clashes with the Plan tab */
 var vaultSel = {platforms:[], stages:[]};
 function resetVaultSel(){ vaultSel.stages = S.stages.map(function(s){return s.id;}); vaultSel.platforms = templatePlatformUnion(); }
-function flash(m){ S.toast=m; render(); clearTimeout(flash._t); flash._t=setTimeout(function(){S.toast="";render();},3200); }
+function flash(m){
+  var t=$("toast"); if(!t) return;
+  t.textContent=m; t.style.display="block";
+  clearTimeout(flash._t);
+  flash._t=setTimeout(function(){ t.style.display="none"; },3200);
+}
 function ask(message,onYes,label){ S.confirm={message:message,onYes:onYes,label:label||"Confirm"}; render(); }
 function sbErr(e){ if(e){ flash("Sync issue: "+(e.message||e)); } }
 
@@ -1945,7 +1951,6 @@ function render(){
     +(S.access==="trial"?'<div class="cc-trial-banner">'+ic("clock",14)+' <span>Free trial — '+trialDaysLeft()+' left. <button class="cc-link-btn" data-action="subscribe-now">Subscribe</button> anytime to keep your data.</span></div>':"")
     +'<main class="cc-main">'+body+'</main>'
     +'<nav class="cc-nav">'+nav+'</nav>'
-    +(S.toast?'<div class="cc-toast">'+esc(S.toast)+'</div>':"")
     +editorModal()
     +collabEditorModal()
     +vaultNewModal()
@@ -1959,7 +1964,10 @@ function render(){
     +vaultScheduleModal()
     +confirmModal()
     +introOverlay();
+  var _m=null,_mTop=0;
+  try{ _m=document.querySelector(".cc-modal"); if(_m)_mTop=_m.scrollTop; }catch(e){}
   $("app").innerHTML=html;
+  try{ var _m2=document.querySelector(".cc-modal"); if(_m2&&_m)_m2.scrollTop=_mTop; }catch(e){}
   if(S.editing){ try{ updateCapCount(); }catch(e){} }
 }
 
@@ -2094,7 +2102,7 @@ document.addEventListener("click",function(e){
   if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
   if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; S.tplJustAdded=false; render(); return; }
   if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); render(); return; }
-  if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } render(); return; }
+  if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } el.classList.toggle("on"); return; }
   if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
   if(a==="tpl-up"){ syncTplFromDOM(); var ui=parseInt(el.getAttribute("data-i"),10); if(ui>0){var t=S.tplEdit[ui-1];S.tplEdit[ui-1]=S.tplEdit[ui];S.tplEdit[ui]=t;} render(); return; }
   if(a==="tpl-down"){ syncTplFromDOM(); var di=parseInt(el.getAttribute("data-i"),10); if(di<S.tplEdit.length-1){var t2=S.tplEdit[di+1];S.tplEdit[di+1]=S.tplEdit[di];S.tplEdit[di]=t2;} render(); return; }
@@ -2110,7 +2118,6 @@ document.addEventListener("click",function(e){
     if(actT){ var nm=($("tpl_name")&&$("tpl_name").value||"").trim(); actT.name = nm || actT.name; }
     S.tplEdit=null; S.tplJustAdded=false; resetPlanStages(); flash("Campaign template saved."); saveTemplate(false); render(); return;
   }
-  if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); S.tplJustAdded=false; render(); return; }
   if(a==="tpl-new"){ syncTplFromDOM(); addTemplate("New template", DEFAULT_STAGES); S.tplEdit=cloneStages(S.stages); S.tplJustAdded=true; flash("Template added — give it a name."); render(); return; }
   if(a==="tpl-dup"){
     syncTplFromDOM();
@@ -2125,7 +2132,6 @@ document.addEventListener("click",function(e){
     },"Delete");
     return;
   }
-  if(a==="pick-tpl"){ switchTemplate(el.value); return; }
   if(a==="dup-post"){ duplicatePost(id); return; }
   if(a==="dup-rel"){ S.dupRelease=id; render(); return; }
   if(a==="copy-captions"){ copyReleaseCaptions(id); return; }
@@ -2160,9 +2166,9 @@ document.addEventListener("change",function(e){
   var a=el.getAttribute("data-action");
   if(a==="filter-plat"){ S.qPlat=el.value; render(); }
   else if(a==="filter-status"){ S.qStatus=el.value; render(); }
-  else if(a==="tpl-dir"){ syncTplFromDOM(); render(); }
+  else if(a==="tpl-dir"){ syncTplFromDOM(); }
   else if(a==="pick-tpl"){ switchTemplate(el.value); }
-  else if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); render(); }
+  else if(a==="tpl-switch"){ syncTplFromDOM(); switchTemplate(el.value); S.tplEdit=cloneStages(S.stages); S.tplJustAdded=false; render(); }
   else if(el.id==="f_platform"){ updateCapCount(); }
 });
 document.addEventListener("input",function(e){
