@@ -615,7 +615,7 @@ var S = {
   templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v41";
+var APP_VERSION = "v42";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -2092,7 +2092,7 @@ document.addEventListener("click",function(e){
   if(a==="wiz-plat"){ var tt4=S.wiz.types[S.wiz.step-1]; var ans2=S.wiz.answers[tt4.key]; var pv2=el.getAttribute("data-v"); var ix2=ans2.platforms.indexOf(pv2); if(ix2>=0)ans2.platforms.splice(ix2,1); else ans2.platforms.push(pv2); render(); return; }
   if(a==="launch-wizard"){ ask("Run the guided setup? It rebuilds your campaign template from your answers. Your existing releases and posts stay exactly as they are.",function(){ initWizard(); S.wizOpen=true; render(); },"Run setup"); return; }
   if(a==="edit-tpl"){ S.tplEdit=cloneStages(S.stages); render(); return; }
-  if(a==="close-tpl"){ S.tplJustAdded=false; if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; render(); return; }
+  if(a==="close-tpl"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tplEdit=null; S.tplJustAdded=false; render(); return; }
   if(a==="tpl-add"){ syncTplFromDOM(); S.tplEdit.push({id:uid(),label:"New stage",offset:-2,platforms:ALL_PLAT.slice()}); render(); return; }
   if(a==="tpl-plat"){ syncTplFromDOM(); var pi=parseInt(el.getAttribute("data-i"),10); var pv=el.getAttribute("data-v"); var st=S.tplEdit[pi]; if(st){ st.platforms=st.platforms||[]; var k=st.platforms.indexOf(pv); if(k>=0)st.platforms.splice(k,1); else st.platforms.push(pv); } render(); return; }
   if(a==="tpl-remove"){ syncTplFromDOM(); var ri=parseInt(el.getAttribute("data-i"),10); S.tplEdit.splice(ri,1); render(); return; }
