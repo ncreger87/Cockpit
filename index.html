@@ -340,7 +340,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-status-check{color:var(--accent);display:flex;}
 
 /* ---- collabs ---- */
-:root{--collab:#79b8f3;}
+:root{--collab:#79b8f3;--trip:#6fd6b0;}
 /* calendar: collab days are unmistakable */
 .cc-cal-cell.collab{background:rgba(121,184,243,.20);box-shadow:inset 0 0 0 1.5px rgba(121,184,243,.65);cursor:pointer;}
 .cc-cal-cell.collab::before{content:"COLLAB";font-size:7px;letter-spacing:.06em;font-weight:800;line-height:1;
@@ -349,6 +349,18 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-cal-cell.collab:hover{background:rgba(121,184,243,.3);}
 .cc-cal-item.is-collab .n{color:var(--collab);}
 .cc-collab-inline{font-size:9px;font-weight:800;letter-spacing:.06em;color:#0b1520;background:var(--collab);
+  border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;}
+/* calendar: trip-range days get a bottom bar so they layer cleanly with collab/today/release states */
+.cc-cal-cell.trip{border-bottom:3px solid var(--trip);cursor:pointer;}
+.cc-trip-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+  border-radius:13px;padding:12px 13px;margin-bottom:10px;cursor:pointer;transition:.15s;}
+.cc-trip-item:active{transform:scale(.99);}
+.cc-trip-main{flex:1;min-width:0;}
+.cc-trip-name{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;}
+.cc-trip-meta{font-size:11.5px;color:var(--mut2);margin-top:2px;}
+.cc-trip-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#07231a;
+  background:var(--trip);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle;}
+.cc-trip-inline{font-size:9px;font-weight:800;letter-spacing:.06em;color:#07231a;background:var(--trip);
   border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;}
 /* collab cards */
 .cc-collab-card{display:flex;align-items:stretch;gap:12px;background:var(--card);border:1px solid var(--line);
@@ -600,12 +612,14 @@ var COLLAB_STATUS=["Tentative","Confirmed","Shot","Canceled"];
 var COLLAB_COLOR={Tentative:"#9b96a9",Confirmed:"#79b8f3",Shot:"#3fb68b",Canceled:"#7a5560"};
 /* Map any legacy status from before the four-status change */
 function normStatus(v){ if(v==="Proposed")return "Tentative"; if(v==="Released")return "Shot"; return (COLLAB_STATUS.indexOf(v)>=0? v : "Tentative"); }
-function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:normStatus(c.status),notes:c.notes||""};}
-function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:normStatus(x.status),notes:x.notes||"",createdAt:x.created_at};}
+function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:normStatus(c.status),notes:c.notes||"",trip_id:c.tripId||null};}
+function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:normStatus(x.status),notes:x.notes||"",tripId:x.trip_id||"",createdAt:x.created_at};}
 function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||"",exclusive:v.exclusive||null};}
 function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",exclusive:x.exclusive||null,createdAt:x.created_at};}
 function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,stage:p.stage,platform:p.platform,post_date:p.date,status:p.status,cta:p.cta,caption:p.caption,asset_link:p.assetLink,results:p.results,asset_ready:!!p.assetReady,caption_ready:!!p.captionReady,winner:!!p.winner};}
 function postFromDb(x){return {id:x.id,releaseId:x.release_id,title:x.title,stage:x.stage,platform:x.platform,date:x.post_date,status:x.status,cta:x.cta,caption:x.caption,assetLink:x.asset_link||"",results:x.results||"",assetReady:!!x.asset_ready,captionReady:!!x.caption_ready,winner:!!x.winner};}
+function tripFromDb(x){return {id:x.id,name:x.name,start:x.start_date||"",end:x.end_date||"",purpose:x.purpose||""};}
+function tripName(id){ var t=S.trips.filter(function(x){return x.id===id;})[0]; return t?t.name:""; }
 
 /* ====================== STATE ====================== */
 function cloneStages(arr){ return arr.map(function(s){return {id:s.id,label:s.label,offset:s.offset,platforms:(s.platforms||ALL_PLAT).slice()};}); }
@@ -621,10 +635,11 @@ var S = {
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
   collabView:"list", collabStatusMenu:null,
-  templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false
+  templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false,
+  trips:[], tripView:null
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v45";
+var APP_VERSION = "v46";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -664,13 +679,14 @@ function loadAndShow(){
 }
 function fetchAll(){
   if(!sb){return;}
-  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*"), sb.from("vault").select("*"), sb.from("collabs").select("*") ]).then(function(r){
-    var rel=r[0], pos=r[1], setres=r[2], vres=r[3], cres=r[4];
+  Promise.all([ sb.from("releases").select("*"), sb.from("posts").select("*"), sb.from("settings").select("*"), sb.from("vault").select("*"), sb.from("collabs").select("*"), sb.from("ledger_trips").select("*") ]).then(function(r){
+    var rel=r[0], pos=r[1], setres=r[2], vres=r[3], cres=r[4], tres=r[5];
     if(rel.error||pos.error){ sbErr(rel.error||pos.error); return; }
     S.releases=(rel.data||[]).map(relFromDb);
     S.posts=(pos.data||[]).map(postFromDb);
     S.vault = (vres && !vres.error && vres.data) ? vres.data.map(vaultFromDb) : [];
     S.collabs = (cres && !cres.error && cres.data) ? cres.data.map(collabFromDb) : [];
+    S.trips = (tres && !tres.error && tres.data) ? tres.data.map(tripFromDb) : [];
     // campaign template + onboarding flag
     var srow = (setres && !setres.error && setres.data && setres.data[0]) ? setres.data[0] : null;
     if(srow && Array.isArray(srow.stages) && srow.stages.length){
@@ -876,7 +892,7 @@ function rescheduleRelease(id, newReleaseDate){
 function duplicateCollab(id){
   var c=S.collabs.filter(function(x){return x.id===id;})[0]; if(!c)return;
   var copy={id:uid(), partner:c.partner, date:c.date, time:c.time||"",
-            location:c.location||"", status:"Tentative", notes:c.notes||""};
+            location:c.location||"", status:"Tentative", notes:c.notes||"", tripId:c.tripId||""};
   S.collabs.push(copy);
   S.collabEdit=Object.assign({},copy);
   render();
@@ -1026,9 +1042,11 @@ function saveCollabFromForm(){
   var date=$("c_date").value;
   if(!partner){ flash("Who's the collab with?"); return; }
   if(!date){ flash("Pick a date for the shoot."); return; }
+  var tripSel = $("c_trip");
+  var tripId = tripSel ? (tripSel.value==="__new__" ? "" : tripSel.value) : "";
   var c={id:id, partner:partner, date:date, time:($("c_time").value||""),
     location:($("c_location").value||"").trim(), status:normStatus($("c_status").value),
-    notes:($("c_notes").value||"").trim(), createdAt:Date.now()};
+    notes:($("c_notes").value||"").trim(), tripId:tripId, createdAt:Date.now()};
   var i=S.collabs.map(function(x){return x.id;}).indexOf(id);
   var isNew = i<0;
   if(isNew){ S.collabs.push(c); } else { c.createdAt=S.collabs[i].createdAt; S.collabs[i]=c; }
@@ -1148,7 +1166,8 @@ function collabCard(c){
     +'<div class="cc-collab-bar" style="background:'+col+'"></div>'
     +'<div class="cc-collab-main">'
       +'<div class="cc-collab-top"><span class="cc-collab-name">'+esc(c.partner)+'</span>'
-      +'<span class="cc-collab-status" style="color:'+col+';border-color:'+col+'44;background:'+col+'1a">'+esc(c.status)+'</span></div>'
+      +'<span class="cc-collab-status" style="color:'+col+';border-color:'+col+'44;background:'+col+'1a">'+esc(c.status)+'</span>'
+      +(c.tripId?'<span class="cc-trip-badge">'+ic("layers",10)+' '+esc(tripName(c.tripId))+'</span>':"")+'</div>'
       +'<div class="cc-collab-meta">'+ic("clock",12)+' '+esc(when)+(c.location?' · '+ic("target",12)+' '+esc(c.location):"")+'</div>'
       +(c.notes?'<div class="cc-collab-notes">'+esc(c.notes)+'</div>':"")
     +'</div>'+ic("chevR")+'</div>';
@@ -1211,6 +1230,9 @@ function collabEditorModal(){
   var c=S.collabEdit; if(!c)return"";
   var isNew=!c.partner && !S.collabs.some(function(x){return x.id===c.id;});
   var opts=COLLAB_STATUS.map(function(s){return '<option value="'+s+'"'+(c.status===s?" selected":"")+'>'+s+'</option>';}).join("");
+  var tripOpts='<option value="">No trip</option>'
+    +S.trips.map(function(t){return '<option value="'+t.id+'"'+((c.tripId||"")===t.id?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
+    +'<option value="__new__">＋ New trip…</option>';
   return '<div class="cc-modal-bg" data-action="close-collab"><div class="cc-modal" data-stop="1">'
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+(isNew?"Schedule a collab":"Edit collab")+'</h2><button class="cc-icon-btn" data-action="close-collab">'+ic("x")+'</button></div>'
     +'<input type="hidden" id="c_id" value="'+esc(c.id)+'">'
@@ -1221,12 +1243,29 @@ function collabEditorModal(){
     +'</div>'
     +'<label class="cc-field"><span>Location <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_location" class="cc-input" value="'+esc(c.location||"")+'" placeholder="Studio, city, or address"></label>'
     +'<label class="cc-field"><span>Status</span><select id="c_status" class="cc-input">'+opts+'</select></label>'
+    +'<label class="cc-field"><span>Trip <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="c_trip" class="cc-input" onchange="handleCollabTripChange(this)">'+tripOpts+'</select></label>'
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="c_notes" class="cc-input" rows="3" placeholder="Ideas, who brings what, split of content…">'+esc(c.notes||"")+'</textarea></label>'
     +'<button class="cc-primary" data-action="save-collab">'+ic("check",16)+' Save collab</button>'
     +(!isNew?'<button class="cc-ghost full" data-action="collab-to-release" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("sparkles",16)+' Turn into a release</button>'
       +'<button class="cc-ghost full" data-action="dup-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("layers",16)+' Duplicate collab</button>'
       +'<button class="cc-ghost danger full" data-action="del-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete collab</button>':"")
     +'</div></div>';
+}
+function handleCollabTripChange(selectEl){
+  if(selectEl.value !== "__new__") return;
+  var name = prompt("New trip name:");
+  if(!name || !name.trim()){ selectEl.value = ""; return; }
+  var tripId = uid(), tripNm = name.trim();
+  if(!sb){ selectEl.value=""; return; }
+  sb.from("ledger_trips").insert([{id:tripId, name:tripNm, start_date:null, end_date:null, purpose:""}]).then(function(r){
+    if(r.error){ sbErr(r.error); selectEl.value=""; return; }
+    S.trips.push({id:tripId, name:tripNm, start:"", end:"", purpose:""});
+    var opt=document.createElement("option");
+    opt.value=tripId; opt.textContent=tripNm;
+    selectEl.insertBefore(opt, selectEl.lastElementChild);
+    selectEl.value=tripId;
+    flash("Trip added");
+  });
 }
 function calendarView(){
   var y=S.cal.y,m=S.cal.m;
@@ -1251,17 +1290,32 @@ function calendarView(){
   });
   monthItems.sort(byDate);
 
+  // trips are a third layer — span a date range rather than a single day
+  var tripByDay={}, monthTrips=[];
+  S.trips.forEach(function(t){
+    if(!t.start || !t.end) return;
+    var d0=new Date(t.start+"T00:00:00"), d1=new Date(t.end+"T00:00:00");
+    if(isNaN(d0)||isNaN(d1)) return;
+    var overlaps=false;
+    for(var dd=new Date(d0); dd<=d1; dd.setDate(dd.getDate()+1)){
+      if(dd.getFullYear()===y && dd.getMonth()===m){ tripByDay[dd.getDate()]=t; overlaps=true; }
+    }
+    if(overlaps) monthTrips.push(t);
+  });
+
   var cells="";
   for(var i=0;i<firstDow;i++)cells+='<div class="cc-cal-cell blank"></div>';
   for(var d=1;d<=days;d++){
     var has=byDay[d];
     var col=colByDay[d];
+    var trp=tripByDay[d];
     var iso=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     var open = "";
     if(has){ open = has[0].kind==="rel" ? ' data-action="open-rel" data-id="'+has[0].rel.id+'"' : ' data-action="edit" data-id="'+has[0].post.id+'"'; }
     else if(col){ open = ' data-action="edit-collab" data-id="'+col[0].id+'"'; }
+    else if(trp){ open = ' data-action="view-trip" data-id="'+trp.id+'"'; }
     var dots = has ? '<span class="cc-cal-dot"></span>'+(has.length>1?'<span class="cc-cal-count">'+has.length+'</span>':"") : "";
-    cells+='<div class="cc-cal-cell'+(iso===tStr?" today":"")+(has?" has":"")+(col?" collab":"")+'"'+open+'><span>'+d+'</span>'+dots+'</div>';
+    cells+='<div class="cc-cal-cell'+(iso===tStr?" today":"")+(has?" has":"")+(col?" collab":"")+(trp?" trip":"")+'"'+open+'><span>'+d+'</span>'+dots+'</div>';
   }
   var wd=""; WD.forEach(function(w){wd+='<div class="cc-cal-wd">'+w+'</div>';});
 
@@ -1269,6 +1323,19 @@ function calendarView(){
   var chips='<button class="cc-chip'+(f==="releases"?" on":"")+'" data-action="calfilter" data-v="releases">Releases</button>'
     +'<button class="cc-chip'+(f==="all"?" on":"")+'" data-action="calfilter" data-v="all">All posts</button>';
   PLATFORMS.forEach(function(p){ chips+='<button class="cc-chip'+(f===p.id?" on":"")+'" data-action="calfilter" data-v="'+p.id+'">'+esc(p.id)+'</button>'; });
+
+  // trips overlapping this month
+  var tripsHTML="";
+  if(monthTrips.length){
+    tripsHTML='<h3 class="cc-sub-h">Trips this month</h3>'
+      +monthTrips.map(function(t){
+        var n=S.collabs.filter(function(c){return c.tripId===t.id;}).length;
+        return '<div class="cc-trip-item" data-action="view-trip" data-id="'+t.id+'">'
+          +'<div class="cc-trip-main"><div class="cc-trip-name">'+esc(t.name)+'</div>'
+          +'<div class="cc-trip-meta">'+esc(fmtDate(t.start))+' → '+esc(fmtDate(t.end))+' · '+n+' collab'+(n===1?"":"s")+'</div></div>'
+          +ic("chevR")+'</div>';
+      }).join("");
+  }
 
   // month list
   var listHTML="";
@@ -1295,7 +1362,24 @@ function calendarView(){
     +'<div class="cc-cal"><div class="cc-cal-head"><div class="cc-cal-title">'+MONTHS[m]+" "+y+'</div>'
     +'<div class="cc-cal-nav"><button data-action="cal" data-dir="-1">'+ic("chevL")+'</button><button data-action="cal" data-dir="0">'+ic("target")+'</button><button data-action="cal" data-dir="1">'+ic("chevR")+'</button></div></div>'
     +'<div class="cc-cal-grid">'+wd+cells+'</div></div>'
+    +tripsHTML
     +'<div class="cc-cal-list">'+listHTML+'</div>';
+}
+
+function tripViewModal(){
+  if(!S.tripView)return"";
+  var t=S.trips.filter(function(x){return x.id===S.tripView;})[0]; if(!t)return"";
+  var cs=S.collabs.filter(function(c){return c.tripId===t.id;}).sort(byDate);
+  var rows = cs.length ? cs.map(function(c){
+    var col=COLLAB_COLOR[c.status]||"#888";
+    return '<div class="cc-cal-item is-collab" data-action="edit-collab" data-id="'+c.id+'"><span class="d">'+esc(fmtDate(c.date))+'</span><span class="n">'+esc(c.partner)+' <span class="cc-collab-status" style="color:'+col+';border-color:'+col+'44;background:'+col+'1a">'+esc(c.status)+'</span></span>'+ic("chevR")+'</div>';
+  }).join("") : '<div class="cc-note" style="margin:0">No collabs tagged to this trip yet.</div>';
+  return '<div class="cc-modal-bg" data-action="close-trip-view"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+esc(t.name)+'</h2><button class="cc-icon-btn" data-action="close-trip-view">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">'+esc(fmtDate(t.start))+' → '+esc(fmtDate(t.end))+(t.purpose?' · '+esc(t.purpose):"")+'</p>'
+    +rows
+    +'<button class="cc-primary" style="margin-top:14px" data-action="add-collab-for-trip" data-id="'+t.id+'">'+ic("plus",16)+' Schedule a collab for this trip</button>'
+    +'</div></div>';
 }
 
 function releaseDetail(){
@@ -1998,6 +2082,7 @@ function render(){
     +tplEditorModal()
     +dateEditModal()
     +vaultScheduleModal()
+    +tripViewModal()
     +confirmModal()
     +introOverlay();
   var _m=null,_mTop=0;
@@ -2059,12 +2144,15 @@ document.addEventListener("click",function(e){
   if(a==="close-status"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.statusMenu=null; render(); return; }
   if(a==="set-status"){ setStatus(id, el.getAttribute("data-status")); return; }
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
-  if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Tentative",notes:""}; render(); return; }
+  if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Tentative",notes:"",tripId:""}; render(); return; }
+  if(a==="add-collab-for-trip"){ S.tripView=null; S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Tentative",notes:"",tripId:id}; render(); return; }
   if(a==="edit-collab"){ var ec=S.collabs.filter(function(x){return x.id===id;})[0]; if(ec){ S.collabEdit=Object.assign({},ec); render(); } return; }
   if(a==="close-collab"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.collabEdit=null; render(); return; }
   if(a==="save-collab"){ saveCollabFromForm(); return; }
   if(a==="del-collab"){ var dc=id; ask("Delete this collab? This won't touch any releases you made from it.",function(){deleteCollab(dc);},"Delete collab"); return; }
   if(a==="collab-to-release"){ collabToRelease(id); return; }
+  if(a==="view-trip"){ S.tripView=id; render(); return; }
+  if(a==="close-trip-view"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tripView=null; render(); return; }
   if(a==="close-handoff"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.handoff=null; render(); return; }
   if(a==="ho-copy"){ if(S.handoff && copyText(S.handoff.caption||"")){ flash("Caption copied — now open the app and paste."); } else { flash("Couldn't copy automatically — select the caption text to copy it."); } return; }
   if(a==="ho-openurl"){
