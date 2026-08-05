@@ -636,10 +636,10 @@ var S = {
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
   collabView:"list", collabStatusMenu:null,
   templates:[], activeTpl:null, dupRelease:null, rescheduleRel:null, tplJustAdded:false,
-  trips:[], tripView:null
+  trips:[], tripView:null, tripForm:null
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v46";
+var APP_VERSION = "v47";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1325,16 +1325,20 @@ function calendarView(){
   PLATFORMS.forEach(function(p){ chips+='<button class="cc-chip'+(f===p.id?" on":"")+'" data-action="calfilter" data-v="'+p.id+'">'+esc(p.id)+'</button>'; });
 
   // trips overlapping this month
-  var tripsHTML="";
+  var tripsHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin:22px 4px 8px">'
+    +'<h3 class="cc-sub-h" style="margin:0">Trips this month</h3>'
+    +'<button class="cc-link-btn" data-action="add-trip">＋ Add trip</button>'
+    +'</div>';
   if(monthTrips.length){
-    tripsHTML='<h3 class="cc-sub-h">Trips this month</h3>'
-      +monthTrips.map(function(t){
-        var n=S.collabs.filter(function(c){return c.tripId===t.id;}).length;
-        return '<div class="cc-trip-item" data-action="view-trip" data-id="'+t.id+'">'
-          +'<div class="cc-trip-main"><div class="cc-trip-name">'+esc(t.name)+'</div>'
-          +'<div class="cc-trip-meta">'+esc(fmtDate(t.start))+' → '+esc(fmtDate(t.end))+' · '+n+' collab'+(n===1?"":"s")+'</div></div>'
-          +ic("chevR")+'</div>';
-      }).join("");
+    tripsHTML += monthTrips.map(function(t){
+      var n=S.collabs.filter(function(c){return c.tripId===t.id;}).length;
+      return '<div class="cc-trip-item" data-action="view-trip" data-id="'+t.id+'">'
+        +'<div class="cc-trip-main"><div class="cc-trip-name">'+esc(t.name)+'</div>'
+        +'<div class="cc-trip-meta">'+esc(fmtDate(t.start))+' → '+esc(fmtDate(t.end))+' · '+n+' collab'+(n===1?"":"s")+'</div></div>'
+        +ic("chevR")+'</div>';
+    }).join("");
+  } else {
+    tripsHTML += '<div class="cc-note" style="margin:0 4px 14px">No trips with dates set fall in this month.</div>';
   }
 
   // month list
@@ -1379,7 +1383,50 @@ function tripViewModal(){
     +'<p class="cc-note" style="margin:0 0 14px">'+esc(fmtDate(t.start))+' → '+esc(fmtDate(t.end))+(t.purpose?' · '+esc(t.purpose):"")+'</p>'
     +rows
     +'<button class="cc-primary" style="margin-top:14px" data-action="add-collab-for-trip" data-id="'+t.id+'">'+ic("plus",16)+' Schedule a collab for this trip</button>'
+    +'<button class="cc-ghost full" style="margin-top:10px" data-action="edit-trip" data-id="'+t.id+'">'+ic("sparkles",15)+' Edit trip</button>'
     +'</div></div>';
+}
+function tripFormModal(){
+  var t=S.tripForm; if(!t)return"";
+  var isNew = !S.trips.some(function(x){return x.id===t.id;});
+  return '<div class="cc-modal-bg" data-action="close-trip-form"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+(isNew?"New trip":"Edit trip")+'</h2><button class="cc-icon-btn" data-action="close-trip-form">'+ic("x")+'</button></div>'
+    +'<input type="hidden" id="t_id" value="'+esc(t.id)+'">'
+    +'<label class="cc-field"><span>Trip name</span><input id="t_name" class="cc-input" value="'+esc(t.name||"")+'" placeholder="e.g. Miami shoot, March"></label>'
+    +'<div class="cc-row2">'
+      +'<label class="cc-field"><span>Start date</span><input id="t_start" type="date" class="cc-input" value="'+esc(t.start||"")+'"></label>'
+      +'<label class="cc-field"><span>End date</span><input id="t_end" type="date" class="cc-input" value="'+esc(t.end||"")+'"></label>'
+    +'</div>'
+    +'<label class="cc-field"><span>Purpose <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="t_purpose" class="cc-input" value="'+esc(t.purpose||"")+'" placeholder="Why this trip is for business"></label>'
+    +'<button class="cc-primary" data-action="save-trip-form">'+ic("check",16)+' '+(isNew?"Create trip":"Save changes")+'</button>'
+    +(!isNew?'<button class="cc-ghost danger full" data-action="delete-trip-form" data-id="'+esc(t.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete trip</button>':"")
+    +'</div></div>';
+}
+function saveTripForm(){
+  var name=($("t_name").value||"").trim();
+  if(!name){ flash("Give the trip a name first."); return; }
+  var start=$("t_start").value||"";
+  var end=$("t_end").value||"";
+  var purpose=($("t_purpose").value||"").trim();
+  var id=$("t_id").value||uid();
+  var trip={id:id, name:name, start:start, end:end, purpose:purpose};
+  var idx=S.trips.map(function(x){return x.id;}).indexOf(id);
+  var isNew = idx<0;
+  if(isNew){ S.trips.push(trip); } else { S.trips[idx]=trip; }
+  S.tripForm=null;
+  flash(isNew?"Trip added.":"Trip updated.");
+  render();
+  if(sb){
+    sb.from("ledger_trips").upsert({id:id, name:name, start_date:start||null, end_date:end||null, purpose:purpose},{onConflict:"id"}).then(function(r){ if(r.error) sbErr(r.error); });
+  }
+}
+function deleteTripLocal(id){
+  S.trips=S.trips.filter(function(t){return t.id!==id;});
+  S.collabs.forEach(function(c){ if(c.tripId===id) c.tripId=""; });
+  S.tripForm=null; S.tripView=null;
+  flash("Trip deleted.");
+  render();
+  if(sb) sb.from("ledger_trips").delete().eq("id",id).then(function(r){ if(r.error) sbErr(r.error); });
 }
 
 function releaseDetail(){
@@ -2083,6 +2130,7 @@ function render(){
     +dateEditModal()
     +vaultScheduleModal()
     +tripViewModal()
+    +tripFormModal()
     +confirmModal()
     +introOverlay();
   var _m=null,_mTop=0;
@@ -2153,6 +2201,11 @@ document.addEventListener("click",function(e){
   if(a==="collab-to-release"){ collabToRelease(id); return; }
   if(a==="view-trip"){ S.tripView=id; render(); return; }
   if(a==="close-trip-view"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tripView=null; render(); return; }
+  if(a==="add-trip"){ S.tripForm={id:uid(), name:"", start:"", end:"", purpose:""}; render(); return; }
+  if(a==="edit-trip"){ var et2=S.trips.filter(function(x){return x.id===id;})[0]; if(et2){ S.tripView=null; S.tripForm=Object.assign({},et2); render(); } return; }
+  if(a==="close-trip-form"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.tripForm=null; render(); return; }
+  if(a==="save-trip-form"){ saveTripForm(); return; }
+  if(a==="delete-trip-form"){ var delTid=id; ask("Delete this trip? Any collabs tagged to it just lose the tag — nothing else is affected.",function(){deleteTripLocal(delTid);},"Delete trip"); return; }
   if(a==="close-handoff"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.handoff=null; render(); return; }
   if(a==="ho-copy"){ if(S.handoff && copyText(S.handoff.caption||"")){ flash("Caption copied — now open the app and paste."); } else { flash("Couldn't copy automatically — select the caption text to copy it."); } return; }
   if(a==="ho-openurl"){
