@@ -176,6 +176,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-cal-cell.today{box-shadow:inset 0 0 0 2px var(--accent);background:rgba(242,166,90,.16);color:var(--txt);}
 .cc-cal-cell.today::after{content:"TODAY";font-size:7.5px;letter-spacing:.08em;font-weight:700;color:var(--accent);line-height:1;}
 .cc-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);}
+.cc-cal-dot.faint{background:transparent;border:1px solid var(--mut2);opacity:.55;}
 .cc-cal-list{margin-bottom:14px;}
 .cc-cal-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--line);cursor:pointer;}
 .cc-cal-item:active{opacity:.7;}
@@ -214,6 +215,9 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-tpl-platlabel{font-size:11.5px;color:var(--mut);font-weight:500;margin-top:2px;}
 .cc-tpl-platnote{font-size:11.5px;color:var(--mut2);margin-top:3px;}
 .cc-vault-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin-bottom:10px;}
+.cc-vault-pick-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;}
+.cc-vault-pick-item{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;cursor:pointer;}
+.cc-vault-pick-item:active{background:var(--card2);}
 .cc-vault-main{flex:1;min-width:0;}
 .cc-vault-name{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;}
 .cc-vault-meta{font-size:11.5px;color:var(--mut2);margin-top:2px;}
@@ -676,6 +680,7 @@ var S = {
   onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null, handoff:null,
+  calVaultPick:null, vaultSchedDate:null,
   releaseDay:null,
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
@@ -684,7 +689,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v54";
+var APP_VERSION = "v55";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1402,7 +1407,8 @@ function calendarView(){
     if(has){ open = has[0].kind==="rel" ? ' data-action="open-rel" data-id="'+has[0].rel.id+'"' : ' data-action="edit" data-id="'+has[0].post.id+'"'; }
     else if(col){ open = ' data-action="edit-collab" data-id="'+col[0].id+'"'; }
     else if(trp){ open = ' data-action="view-trip" data-id="'+trp.id+'"'; }
-    var dots = has ? '<span class="cc-cal-dot"></span>'+(has.length>1?'<span class="cc-cal-count">'+has.length+'</span>':"") : "";
+    else if(S.vault.length){ open = ' data-action="cal-day-open" data-id="'+iso+'"'; }
+    var dots = has ? '<span class="cc-cal-dot"></span>'+(has.length>1?'<span class="cc-cal-count">'+has.length+'</span>':"") : (!col&&!trp&&S.vault.length?'<span class="cc-cal-dot faint"></span>':"");
     cells+='<div class="cc-cal-cell'+(iso===tStr?" today":"")+(has?" has":"")+(col?" collab":"")+(trp?" trip":"")+'"'+open+'><span>'+d+'</span>'+dots+'</div>';
   }
   var wd=""; WD.forEach(function(w){wd+='<div class="cc-cal-wd">'+w+'</div>';});
@@ -1868,12 +1874,28 @@ function dateEditModal(){
     +'</div></div>';
 }
 
+function calVaultPickModal(){
+  if(!S.calVaultPick)return"";
+  var d=S.calVaultPick;
+  var items=S.vault.map(function(v){
+    return '<button class="cc-vault-pick-item" data-action="cal-vault-choose" data-id="'+v.id+'">'
+      +'<div class="cc-vault-name">'+esc(v.name)+(v.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(v.exclusive)+'</span>':"")+'</div>'
+      +(v.notes?'<div class="cc-vault-meta">'+esc(v.notes)+'</div>':"")
+      +'</button>';
+  }).join("");
+  return '<div class="cc-modal-bg" data-action="close-calvault"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Schedule on '+esc(fmtDate(d))+'</h2><button class="cc-icon-btn" data-action="close-calvault">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 14px">Pick something from your Vault to release this day.</p>'
+    +'<div class="cc-vault-pick-list">'+items+'</div>'
+    +'</div></div>';
+}
+
 function vaultScheduleModal(){
   if(!S.vaultSchedule)return"";
   var v=S.vault.filter(function(x){return x.id===S.vaultSchedule;})[0]; if(!v)return"";
   var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(vaultSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="vpill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
   var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(vaultSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="vpill-stage" data-v="'+s.id+'">'+esc(s.label)+' <span style="opacity:.55">'+esc(stageTimingShort(s.offset))+'</span></button>';});
-  var defDate = S.releaseDay===null ? addDays(todayStr(),7) : nextWeekday(S.releaseDay);
+  var defDate = S.vaultSchedDate || (S.releaseDay===null ? addDays(todayStr(),7) : nextWeekday(S.releaseDay));
   return '<div class="cc-modal-bg" data-action="close-vsched"><div class="cc-modal" data-stop="1">'
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Schedule "'+esc(v.name)+'"</h2><button class="cc-icon-btn" data-action="close-vsched">'+ic("x")+'</button></div>'
     +(v.notes?'<p class="cc-note" style="margin:0 0 12px;font-style:italic">'+esc(v.notes)+'</p>':"")
@@ -2254,6 +2276,7 @@ function render(){
     +handoffModal()
     +tplEditorModal()
     +dateEditModal()
+    +calVaultPickModal()
     +vaultScheduleModal()
     +tripViewModal()
     +tripFormModal()
@@ -2377,8 +2400,23 @@ document.addEventListener("click",function(e){
     flash(S.releaseDay===null ? "Release day cleared." : "Release day set to "+DAY_NAMES[S.releaseDay]+".");
     render(); return;
   }
-  if(a==="vault-schedule"){
+  if(a==="cal-day-open"){ S.calVaultPick=id; render(); return; }
+  if(a==="close-calvault"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.calVaultPick=null; render(); return; }
+  if(a==="cal-vault-choose"){
+    var pickedDate=S.calVaultPick;
+    S.calVaultPick=null;
+    S.vaultSchedDate=pickedDate;
+    var vsv2=S.vault.filter(function(x){return x.id===id;})[0];
     S.vaultSchedule=id;
+    if(vsv2){
+      var valid2=S.stages.filter(function(s){return (vsv2.stageIds||[]).indexOf(s.id)>=0;}).map(function(s){return s.id;});
+      vaultSel.platforms = (vsv2.platforms&&vsv2.platforms.length) ? vsv2.platforms.slice() : ALL_PLAT.slice();
+      vaultSel.stages = valid2.length ? valid2 : S.stages.map(function(s){return s.id;});
+    } else { resetVaultSel(); }
+    render(); return;
+  }
+  if(a==="vault-schedule"){
+    S.vaultSchedule=id; S.vaultSchedDate=null;
     var vsv=S.vault.filter(function(x){return x.id===id;})[0];
     if(vsv){
       var valid=S.stages.filter(function(s){return (vsv.stageIds||[]).indexOf(s.id)>=0;}).map(function(s){return s.id;});
@@ -2387,14 +2425,14 @@ document.addEventListener("click",function(e){
     } else { resetVaultSel(); }
     render(); return;
   }
-  if(a==="close-vsched"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.vaultSchedule=null; render(); return; }
+  if(a==="close-vsched"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.vaultSchedule=null; S.vaultSchedDate=null; render(); return; }
   if(a==="vault-do-schedule"){
     var vd=$("vs_date").value; if(!vd){flash("Pick a date.");return;}
     if(!vaultSel.platforms.length){flash("Pick at least one platform.");return;}
     if(!vaultSel.stages.length){flash("Pick at least one stage.");return;}
     var vsordered=S.stages.filter(function(s){return vaultSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     var vsexcl=($("vs_excl")&&$("vs_excl").value)||null;
-    var vid=id; S.vaultSchedule=null;
+    var vid=id; S.vaultSchedule=null; S.vaultSchedDate=null;
     scheduleVaultItem(vid,vd,vaultSel.platforms.slice(),vsordered,vsexcl);
     return;
   }
