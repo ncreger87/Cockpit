@@ -175,8 +175,8 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 /* TODAY always stands out, even when it also has posts */
 .cc-cal-cell.today{box-shadow:inset 0 0 0 2px var(--accent);background:rgba(242,166,90,.16);color:var(--txt);}
 .cc-cal-cell.today::after{content:"TODAY";font-size:7.5px;letter-spacing:.08em;font-weight:700;color:var(--accent);line-height:1;}
-.cc-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);}
-.cc-cal-dot.faint{background:transparent;border:1px solid var(--mut2);opacity:.55;}
+.cc-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--txt);}
+.cc-cal-dot.faint{background:transparent;border:1px solid var(--txt);opacity:.55;}
 .cc-cal-list{margin-bottom:14px;}
 .cc-cal-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--line);cursor:pointer;}
 .cc-cal-item:active{opacity:.7;}
@@ -216,7 +216,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-tpl-platnote{font-size:11.5px;color:var(--mut2);margin-top:3px;}
 .cc-vault-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin-bottom:10px;}
 .cc-vault-pick-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;}
-.cc-vault-pick-item{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;cursor:pointer;}
+.cc-vault-pick-item{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;cursor:pointer;color:var(--txt);font-family:inherit;}
 .cc-vault-pick-item:active{background:var(--card2);}
 .cc-vault-main{flex:1;min-width:0;}
 .cc-vault-name{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;}
@@ -606,6 +606,13 @@ function dayForOffset(offset){
   var idx=((S.releaseDay+offset)%7+7)%7;
   return DAY_ABBR[idx];
 }
+/* Weekday from a real chosen date + offset — always correct regardless of "usual day" */
+function weekdayForActualDate(dateStr,offset){
+  var d=new Date(addDays(dateStr,offset)+"T00:00:00");
+  if(isNaN(d)) return null;
+  return DAY_ABBR[d.getDay()];
+}
+function handleScheduleDateChange(el){ S.vaultSchedDate = el.value || S.vaultSchedDate; render(); }
 /* Compact timing for pills: "Tue" if release day known, else "-3d" */
 function stageTimingShort(offset){
   var d=dayForOffset(offset);
@@ -689,7 +696,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v55";
+var APP_VERSION = "v56";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1893,13 +1900,19 @@ function calVaultPickModal(){
 function vaultScheduleModal(){
   if(!S.vaultSchedule)return"";
   var v=S.vault.filter(function(x){return x.id===S.vaultSchedule;})[0]; if(!v)return"";
-  var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(vaultSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="vpill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
-  var stages=""; S.stages.forEach(function(s){stages+='<button class="cc-pill'+(vaultSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="vpill-stage" data-v="'+s.id+'">'+esc(s.label)+' <span style="opacity:.55">'+esc(stageTimingShort(s.offset))+'</span></button>';});
   var defDate = S.vaultSchedDate || (S.releaseDay===null ? addDays(todayStr(),7) : nextWeekday(S.releaseDay));
+  var liveDate = defDate;
+  var plats=""; PLATFORMS.forEach(function(p){plats+='<button class="cc-pill'+(vaultSel.platforms.indexOf(p.id)>=0?" on":"")+'" data-action="vpill-plat" data-v="'+p.id+'">'+esc(p.id)+'</button>';});
+  var stages=""; S.stages.forEach(function(s){
+    var wd=weekdayForActualDate(liveDate,s.offset);
+    var lbl = s.offset===0 ? "day of" : wd ? wd : ((s.offset<0?"-":"+")+Math.abs(s.offset)+"d");
+    stages+='<button class="cc-pill'+(vaultSel.stages.indexOf(s.id)>=0?" on":"")+'" data-action="vpill-stage" data-v="'+s.id+'">'+esc(s.label)+' <span style="opacity:.55">'+esc(lbl)+'</span></button>';
+  });
   return '<div class="cc-modal-bg" data-action="close-vsched"><div class="cc-modal" data-stop="1">'
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Schedule "'+esc(v.name)+'"</h2><button class="cc-icon-btn" data-action="close-vsched">'+ic("x")+'</button></div>'
     +(v.notes?'<p class="cc-note" style="margin:0 0 12px;font-style:italic">'+esc(v.notes)+'</p>':"")
-    +'<label class="cc-field"><span>Release date'+(S.releaseDay!==null?' <span style="color:var(--mut2);font-weight:400">— your usual day is '+DAY_NAMES[S.releaseDay]+'</span>':"")+'</span><input id="vs_date" type="date" class="cc-input" value="'+defDate+'"></label>'
+    +'<label class="cc-field"><span>Release date</span><input id="vs_date" type="date" class="cc-input" value="'+liveDate+'" onchange="handleScheduleDateChange(this)"></label>'
+    +'<p class="cc-note" style="margin:-6px 0 12px">Stage days below match whatever date you pick here.</p>'
     +(S.templates.length>1
       ? '<label class="cc-field"><span>Template</span><select id="vs_tpl" class="cc-input" data-action="vs-pick-tpl">'
         +S.templates.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===S.activeTpl?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")
