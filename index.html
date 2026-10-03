@@ -38,7 +38,7 @@
   --ok:#3fb68b; --bad:#d8695f;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
-html,body{background:var(--bg);}
+html,body{background:var(--bg);overscroll-behavior-y:none;}
 body{font-family:'Outfit',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--txt);
   background:radial-gradient(120% 80% at 100% 0%, #221a2a 0%, transparent 55%),
     radial-gradient(120% 80% at 0% 0%, #1a1622 0%, transparent 50%), var(--bg);
@@ -185,7 +185,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-cal-item svg{width:16px;height:16px;margin-left:auto;color:var(--mut2);}
 .cc-cal-empty{color:var(--mut2);font-size:13px;text-align:center;padding:18px;line-height:1.5;}
 
-.cc-nav{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;display:flex;background:rgba(18,16,24,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom));}
+.cc-nav{position:fixed;bottom:0;left:0;right:0;max-width:560px;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);margin:0 auto;display:flex;background:rgba(18,16,24,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom));}
 .cc-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--mut2);font-size:10.5px;cursor:pointer;padding:5px 0;transition:.15s;}
 .cc-nav-btn.on{color:var(--accent);}
 .cc-nav-btn svg{width:20px;height:20px;}
@@ -218,9 +218,14 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-vault-pick-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;}
 .cc-vault-pick-item{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;cursor:pointer;color:var(--txt);font-family:inherit;}
 .cc-vault-pick-item:active{background:var(--card2);}
+.cc-day-list{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;}
+.cc-day-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;color:var(--txt);}
+.cc-day-actions{display:flex;gap:8px;margin-top:10px;}
+.cc-day-actions .cc-ghost{flex:1;padding:9px 8px;font-size:13px;}
 .cc-vault-main{flex:1;min-width:0;}
 .cc-vault-name{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;}
 .cc-vault-meta{font-size:11.5px;color:var(--mut2);margin-top:2px;}
+.cc-dim{opacity:.5;}
 .cc-vault-go{display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line2);color:var(--accent);font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;border-radius:10px;cursor:pointer;transition:.15s;}
 .cc-vault-go:active{transform:scale(.95);}
 .cc-vault-go svg{width:15px;height:15px;}
@@ -544,6 +549,67 @@ var DEFAULT_STAGES = [
 ];
 var STATUS_ORDER = ["Idea","Draft","Ready","Scheduled","Posted","Reviewed"];
 var STATUS_COLOR = {Idea:"#8A8A99",Draft:"#E0A23C",Ready:"#3FB68B",Scheduled:"#5B8DEF",Posted:"#9B7BE8",Reviewed:"#6B6B78"};
+var SCENE_COLS=["idea","editing","ready","released"];
+var SCENE_COL_LABEL={idea:"Idea",editing:"Needs Editing",ready:"Ready to Post",released:"Released"};
+var SCENE_COL_COLOR={idea:"#9b96a9",editing:"#E0A23C",ready:"#5B8DEF",released:"#3FB68B"};
+function sceneEffectiveStage(obj,isRelease){
+  if(isRelease){
+    var rp=S.posts.filter(function(p){return p.releaseId===obj.id;});
+    if(rp.length && rp.every(function(p){return !isOpen(p);})) return "released";
+  }
+  return obj.stage || "idea";
+}
+function allScenes(){
+  var out=[];
+  S.vault.forEach(function(v){ out.push({id:v.id,kind:"vault",name:v.name,stage:sceneEffectiveStage(v,false),sourceCollabId:v.sourceCollabId||null,date:null,exclusive:v.exclusive||null}); });
+  S.releases.forEach(function(r){ out.push({id:r.id,kind:"release",name:r.name,stage:sceneEffectiveStage(r,true),sourceCollabId:r.sourceCollabId||null,date:r.date,exclusive:r.exclusive||null}); });
+  return out;
+}
+function sceneBadges(sc){
+  var collab = sc.sourceCollabId ? S.collabs.filter(function(c){return c.id===sc.sourceCollabId;})[0] : null;
+  var bits=[];
+  bits.push(sc.date ? fmtDate(sc.date) : "No date yet");
+  if(collab) bits.push(ic("users",11)+" "+esc(collab.partner));
+  if(sc.exclusive) bits.push(ic("lock",11)+" "+esc(sc.exclusive)+" exclusive");
+  return bits.join(' <span class="cc-dim">·</span> ');
+}
+function sceneBoardCard(sc){
+  var col=SCENE_COL_COLOR[sc.stage]||"#888";
+  var openAction = sc.kind==="release" ? "open-rel" : "vault-schedule";
+  return '<div class="cc-board-card">'
+    +'<div class="cc-board-card-main" data-action="'+openAction+'" data-id="'+sc.id+'">'
+      +'<div class="cc-board-name">'+esc(sc.name)+'</div>'
+      +'<div class="cc-board-meta">'+sceneBadges(sc)+'</div>'
+    +'</div>'
+    +(sc.stage!=="released"?'<button class="cc-board-move" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" title="Move to another stage">'
+      +'<span class="cc-status-dot" style="background:'+col+'"></span>'+ic("chevR",14)+'</button>':'<span class="cc-board-move" style="cursor:default"><span class="cc-status-dot" style="background:'+col+'"></span></span>')
+  +'</div>';
+}
+function sceneBoard(){
+  var all=allScenes(), out="";
+  SCENE_COLS.forEach(function(st){
+    var col=SCENE_COL_COLOR[st];
+    var inCol=all.filter(function(sc){return sc.stage===st;}).sort(function(a,b){return (a.date||"9999").localeCompare(b.date||"9999");});
+    out+='<div class="cc-board-col"><div class="cc-board-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<span class="cc-board-title">'+SCENE_COL_LABEL[st]+'</span><span class="cc-board-count">'+inCol.length+'</span></div>';
+    if(inCol.length){ inCol.forEach(function(sc){ out+=sceneBoardCard(sc); }); }
+    else { out+='<div class="cc-board-empty">Nothing here yet</div>'; }
+    out+='</div>';
+  });
+  return out;
+}
+function sceneListCard(sc){
+  var col=SCENE_COL_COLOR[sc.stage]||"#888";
+  var openAction = sc.kind==="release" ? "open-rel" : "vault-schedule";
+  return '<div class="cc-vault-item">'
+    +'<div class="cc-vault-main" data-action="'+openAction+'" data-id="'+sc.id+'" style="cursor:pointer;flex:1;min-width:0">'
+      +'<div class="cc-vault-name">'+esc(sc.name)+'</div>'
+      +'<div class="cc-vault-meta">'+sceneBadges(sc)+'</div>'
+    +'</div>'
+    +(sc.stage!=="released"?'<button class="cc-icon-btn" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'"><span class="cc-status-dot" style="background:'+col+'"></span></button>'
+      :'<span class="cc-status-dot" style="background:'+col+'"></span>')
+  +'</div>';
+}
 var CTAS = ["Subscribe","Renew","Presale","Tip","Comment","Profile Click","None"];
 var WD = ["S","M","T","W","T","F","S"];
 var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -661,16 +727,16 @@ function releasesOverdue(){
 function byDate(a,b){return String(a.date||"").localeCompare(String(b.date||""));}
 
 /* ====================== DATA MAPPERS ====================== */
-function relToDb(r){return {id:r.id,name:r.name,release_date:r.date,platforms:r.platforms||[],exclusive:r.exclusive||null};}
-function relFromDb(x){return {id:x.id,name:x.name,date:x.release_date,platforms:x.platforms||[],exclusive:x.exclusive||null,createdAt:x.created_at};}
+function relToDb(r){return {id:r.id,name:r.name,release_date:r.date,platforms:r.platforms||[],exclusive:r.exclusive||null,stage:r.stage||"ready",source_collab_id:r.sourceCollabId||null};}
+function relFromDb(x){return {id:x.id,name:x.name,date:x.release_date,platforms:x.platforms||[],exclusive:x.exclusive||null,createdAt:x.created_at,stage:x.stage||"ready",sourceCollabId:x.source_collab_id||null};}
 var COLLAB_STATUS=["Tentative","Confirmed","Shot","Canceled"];
 var COLLAB_COLOR={Tentative:"#9b96a9",Confirmed:"#79b8f3",Shot:"#3fb68b",Canceled:"#7a5560"};
 /* Map any legacy status from before the four-status change */
 function normStatus(v){ if(v==="Proposed")return "Tentative"; if(v==="Released")return "Shot"; return (COLLAB_STATUS.indexOf(v)>=0? v : "Tentative"); }
 function collabToDb(c){return {id:c.id,partner:c.partner,collab_date:c.date,collab_time:c.time||null,location:c.location||"",status:normStatus(c.status),notes:c.notes||"",trip_id:c.tripId||null};}
 function collabFromDb(x){return {id:x.id,partner:x.partner,date:x.collab_date,time:x.collab_time||"",location:x.location||"",status:normStatus(x.status),notes:x.notes||"",tripId:x.trip_id||"",createdAt:x.created_at};}
-function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||"",exclusive:v.exclusive||null};}
-function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",exclusive:x.exclusive||null,createdAt:x.created_at};}
+function vaultToDb(v){return {id:v.id,name:v.name,platforms:v.platforms||[],stage_ids:v.stageIds||[],notes:v.notes||"",exclusive:v.exclusive||null,stage:v.stage||"idea",source_collab_id:v.sourceCollabId||null};}
+function vaultFromDb(x){return {id:x.id,name:x.name,platforms:x.platforms||[],stageIds:x.stage_ids||[],notes:x.notes||"",exclusive:x.exclusive||null,createdAt:x.created_at,stage:x.stage||"idea",sourceCollabId:x.source_collab_id||null};}
 function postToDb(p){return {id:p.id,release_id:p.releaseId||null,title:p.title,stage:p.stage,platform:p.platform,post_date:p.date,status:p.status,cta:p.cta,caption:p.caption,asset_link:p.assetLink,results:p.results,asset_ready:!!p.assetReady,caption_ready:!!p.captionReady,winner:!!p.winner};}
 function postFromDb(x){return {id:x.id,releaseId:x.release_id,title:x.title,stage:x.stage,platform:x.platform,date:x.post_date,status:x.status,cta:x.cta,caption:x.caption,assetLink:x.asset_link||"",results:x.results||"",assetReady:!!x.asset_ready,captionReady:!!x.caption_ready,winner:!!x.winner};}
 function tripFromDb(x){return {id:x.id,name:x.name,start:x.start_date||"",end:x.end_date||"",purpose:x.purpose||""};}
@@ -687,7 +753,8 @@ var S = {
   onboarded:true, intro:0, calFilter:"releases", dateEdit:null,
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null, handoff:null,
-  calVaultPick:null, vaultSchedDate:null,
+  calVaultPick:null, vaultSchedDate:null, calDay:null,
+  sceneStageMenu:null, sceneView:"list", showReleasedScenes:false, pendingCollabLink:null,
   releaseDay:null,
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
@@ -696,7 +763,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v56";
+var APP_VERSION = "v58";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1040,6 +1107,24 @@ function deleteRelease(rid){
   S.openRelease=null; flash("Release removed.");
   if(sb)sb.from("releases").delete().eq("id",rid).then(function(r){ if(r.error)sbErr(r.error); });
 }
+function moveReleaseToVault(rid){
+  var r=S.releases.filter(function(x){return x.id===rid;})[0]; if(!r) return;
+  var v={id:uid(),name:r.name,platforms:(r.platforms||[]).slice(),stageIds:[],notes:"",exclusive:r.exclusive||null,createdAt:Date.now()};
+  function finish(){
+    S.vault.push(v);
+    S.releases=S.releases.filter(function(x){return x.id!==rid;});
+    S.posts=S.posts.filter(function(p){return p.releaseId!==rid;});
+    S.openRelease=null; S.calDay=null;
+    flash('"'+r.name+'" is back in your Vault.');
+    render();
+  }
+  if(!sb){ finish(); return; }
+  sb.from("vault").insert(vaultToDb(v)).then(function(res){
+    if(res.error){ sbErr(res.error); flash("Couldn't move it — nothing was changed."); return; }
+    finish();
+    sb.from("releases").delete().eq("id",rid).then(function(r2){ if(r2.error)sbErr(r2.error); });
+  });
+}
 function changeReleaseDate(rid, newDate, shiftPosts){
   var rel=S.releases.filter(function(r){return r.id===rid;})[0]; if(!rel)return;
   var oldDate=rel.date;
@@ -1066,7 +1151,7 @@ function releaseProgress(rid){
   var done=rp.filter(function(p){return ["Scheduled","Posted","Reviewed"].indexOf(p.status)>=0;}).length;
   return done/rp.length*100;
 }
-function generate(name,date,platforms,stageIds,exclusive){
+function generate(name,date,platforms,stageIds,exclusive,stageVal,sourceCollabId){
   var rid=uid();
   var chosen = S.stages.filter(function(s){return stageIds.indexOf(s.id)>=0;});
   var staleTemplate=false;
@@ -1084,7 +1169,7 @@ function generate(name,date,platforms,stageIds,exclusive){
   });
   if(!newPosts.length){ flash("No posts to create — none of the chosen stages post to the platforms you picked. Adjust platforms or your template."); render(); return false; }
   var relPlats=Object.keys(usedPlats);
-  var rel={id:rid,name:name,date:date,platforms:relPlats,exclusive:exclusive||null,createdAt:Date.now()};
+  var rel={id:rid,name:name,date:date,platforms:relPlats,exclusive:exclusive||null,createdAt:Date.now(),stage:stageVal||"ready",sourceCollabId:sourceCollabId||null};
   S.releases.push(rel);
   S.posts=S.posts.concat(newPosts);
   var n=newPosts.length;
@@ -1138,14 +1223,15 @@ function deleteCollab(cid){
 function collabToRelease(cid){
   var c=S.collabs.filter(function(x){return x.id===cid;})[0]; if(!c)return;
   S.planName = c.partner;
+  S.pendingCollabLink = cid;
   S.collabEdit=null;
   S.tab="plan";
   resetPlanStages();
   flash("Name prefilled from your collab — pick a drop date and generate.");
   render();
 }
-function addVault(name,platforms,stageIds,exclusive,notes){
-  var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:notes||"",exclusive:exclusive||null,createdAt:Date.now()};
+function addVault(name,platforms,stageIds,exclusive,notes,sourceCollabId){
+  var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:notes||"",exclusive:exclusive||null,createdAt:Date.now(),stage:"idea",sourceCollabId:sourceCollabId||null};
   S.vault.push(v);
   flash('"'+name+'" saved to your Vault.');
   if(sb)sb.from("vault").insert(vaultToDb(v)).then(function(r){ if(r.error)sbErr(r.error); });
@@ -1155,9 +1241,9 @@ function deleteVault(id){
   flash("Removed from Vault.");
   if(sb)sb.from("vault").delete().eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
 }
-function scheduleVaultItem(id,date,platforms,stageIds,exclusive){
+function scheduleVaultItem(id,date,platforms,stageIds,exclusive,stageVal,sourceCollabId){
   var v=S.vault.filter(function(x){return x.id===id;})[0]; if(!v)return;
-  var ok = generate(v.name,date,platforms,stageIds,exclusive);
+  var ok = generate(v.name,date,platforms,stageIds,exclusive,stageVal,sourceCollabId);
   if(!ok){ render(); return; }
   S.vault=S.vault.filter(function(x){return x.id!==id;});
   if(sb)sb.from("vault").delete().eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
@@ -1347,6 +1433,7 @@ function collabEditorModal(){
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="c_notes" class="cc-input" rows="3" placeholder="Ideas, who brings what, split of content…">'+esc(c.notes||"")+'</textarea></label>'
     +'<button class="cc-primary" data-action="save-collab">'+ic("check",16)+' Save collab</button>'
     +(!isNew?'<button class="cc-ghost full" data-action="collab-to-release" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("sparkles",16)+' Turn into a release</button>'
+      +'<button class="cc-ghost full" data-action="collab-to-vault" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("vault",16)+' Save as a Vault idea</button>'
       +'<button class="cc-ghost full" data-action="dup-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("layers",16)+' Duplicate collab</button>'
       +'<button class="cc-ghost danger full" data-action="del-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete collab</button>':"")
     +'</div></div>';
@@ -1411,7 +1498,7 @@ function calendarView(){
     var trp=tripByDay[d];
     var iso=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     var open = "";
-    if(has){ open = has[0].kind==="rel" ? ' data-action="open-rel" data-id="'+has[0].rel.id+'"' : ' data-action="edit" data-id="'+has[0].post.id+'"'; }
+    if(has){ open = ' data-action="cal-day-view" data-id="'+iso+'"'; }
     else if(col){ open = ' data-action="edit-collab" data-id="'+col[0].id+'"'; }
     else if(trp){ open = ' data-action="view-trip" data-id="'+trp.id+'"'; }
     else if(S.vault.length){ open = ' data-action="cal-day-open" data-id="'+iso+'"'; }
@@ -1572,6 +1659,7 @@ function releaseDetail(){
     +'<button class="cc-ghost full" data-action="copy-captions" data-id="'+r.id+'" style="margin-top:10px">'+ic("copy")+' Copy all captions</button>'
     +'<button class="cc-ghost full" data-action="reschedule-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("clock")+' Shift all dates</button>'
     +'<button class="cc-ghost full" data-action="dup-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("layers")+' Duplicate this campaign</button>'
+    +'<button class="cc-ghost full" data-action="rel-to-vault" data-id="'+r.id+'" style="margin-top:10px">'+ic("vault")+' Move back to Vault</button>'
     +'<button class="cc-ghost danger full" data-action="del-rel" data-id="'+r.id+'">'+ic("trash")+' Delete release</button>'
     +'</section>';
 }
@@ -1600,7 +1688,25 @@ function planView(){
 }
 
 function vaultView(){
-  var inner='<button class="cc-primary" data-action="vault-new-open">'+ic("plus",16)+' Add a scene to the Vault</button>';
+  var all=allScenes();
+  var toggle='<div class="cc-toggle"><button class="'+(S.sceneView!=="board"?"on":"")+'" data-action="sceneview" data-v="list">List</button>'
+    +'<button class="'+(S.sceneView==="board"?"on":"")+'" data-action="sceneview" data-v="board">Board</button></div>';
+  var inner='<button class="cc-primary" data-action="vault-new-open">'+ic("plus",16)+' Add a scene to the Vault</button>'+toggle;
+  if(S.sceneView==="board"){
+    if(all.length){ inner+=sceneBoard(); } else { inner+=empty("vault","No scenes yet. Add an idea, or turn a collab into one."); }
+    return section("Scenes","Every scene, wherever it is in your pipeline. Tap the dot to move its stage.",inner);
+  }
+  var attention=all.filter(function(sc){return sc.stage==="idea"||sc.stage==="editing";});
+  var readyOnes=all.filter(function(sc){return sc.stage==="ready";});
+  var released=all.filter(function(sc){return sc.stage==="released";});
+  if(attention.length){ inner+='<h3 class="cc-sub-h">Needs attention</h3>'; attention.forEach(function(sc){inner+=sceneListCard(sc);}); }
+  if(readyOnes.length){ inner+='<h3 class="cc-sub-h">Ready to post</h3>'; readyOnes.forEach(function(sc){inner+=sceneListCard(sc);}); }
+  if(!attention.length && !readyOnes.length){ inner+=empty("vault","No scenes yet. Add an idea, or turn a collab into one."); }
+  if(released.length){
+    inner+='<button class="cc-ghost full" data-action="toggle-released-scenes" style="margin-top:16px">'
+      +(S.showReleasedScenes?ic("chevR",15)+' Hide released':ic("check",15)+' Show released ('+released.length+')')+'</button>';
+    if(S.showReleasedScenes){ inner+='<div style="margin-top:10px">'; released.forEach(function(sc){inner+=sceneListCard(sc);}); inner+='</div>'; }
+  }
   if(S.vault.length){
     S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
       inner+='<div class="cc-vault-item">'
@@ -1613,7 +1719,7 @@ function vaultView(){
   } else {
     inner+=empty("layers","No saved scenes yet. Tap <b>Add a scene to the Vault</b> above to park one until you're ready to pick a date.");
   }
-  return section("The Vault","Park an idea with just a name — pick the date, platforms and template when you're ready to schedule it.",inner);
+  return section("Scenes","Every scene, wherever it is in your pipeline — park an idea here, or tap a stage dot to move it along.",inner);
 }
 
 function moreView(){
@@ -1745,6 +1851,9 @@ function vaultNewModal(){
     +'<p class="cc-note" style="margin:0 0 14px">Just get the idea down. You\'ll pick the date, platforms and template when you schedule it.</p>'
     +'<label class="cc-field"><span>Scene name</span><input id="v_name" class="cc-input" placeholder="e.g. Hotel shoot with Andy"></label>'
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="v_notes" class="cc-input" rows="3" placeholder="Anything worth remembering — angle, outfit, who\'s in it…"></textarea></label>'
+    +(S.collabs.length?'<label class="cc-field"><span>Linked to a collab <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="v_collab" class="cc-input"><option value="">Not linked</option>'
+      +S.collabs.filter(function(c){return c.status!=="Canceled";}).map(function(c){return '<option value="'+c.id+'">'+esc(c.partner)+' — '+esc(fmtDate(c.date))+'</option>';}).join("")
+      +'</select></label>':"")
     +'<button class="cc-primary" data-action="vault-new-save">'+ic("layers",16)+' Save to Vault</button>'
     +'</div></div>';
 }
@@ -1879,6 +1988,70 @@ function dateEditModal(){
     +'<button class="cc-primary" data-action="date-shift" data-id="'+r.id+'" style="margin-bottom:10px">'+ic("check",16)+' Move date &amp; shift all posts</button>'
     +'<button class="cc-ghost full" data-action="date-only" data-id="'+r.id+'">Change date only — leave posts where they are</button>'
     +'</div></div>';
+}
+
+function calDayModal(){
+  if(!S.calDay)return"";
+  var iso=S.calDay, f=S.calFilter||"releases", rows="";
+  if(f==="releases"){
+    S.releases.filter(function(r){return r.date===iso;}).forEach(function(r){
+      var rp=S.posts.filter(function(p){return p.releaseId===r.id;});
+      var done=rp.filter(function(p){return !isOpen(p);}).length;
+      rows+='<div class="cc-day-card">'
+        +'<div class="cc-vault-name">'+esc(r.name)+(r.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(r.exclusive)+'</span>':"")+'</div>'
+        +'<div class="cc-vault-meta">'+esc((r.platforms||[]).join(" · "))+(rp.length?' · '+done+' of '+rp.length+' posted':"")+'</div>'
+        +'<div class="cc-day-actions">'
+          +'<button class="cc-ghost" data-action="open-rel" data-id="'+r.id+'">'+ic("layers",14)+' Open</button>'
+          +'<button class="cc-ghost" data-action="rel-to-vault" data-id="'+r.id+'">'+ic("vault",14)+' Move to Vault</button>'
+        +'</div></div>';
+    });
+  } else {
+    S.posts.filter(function(p){return p.date===iso && (f==="all"||p.platform===f);}).sort(byDate).forEach(function(p){
+      rows+='<button class="cc-vault-pick-item" data-action="edit" data-id="'+p.id+'"><div class="cc-vault-name">'+esc(p.title)+'</div><div class="cc-vault-meta">'+esc(p.platform)+' · '+esc(p.stage)+' · '+esc(p.status)+'</div></button>';
+    });
+  }
+  S.collabs.filter(function(c){return c.date===iso && c.status!=="Canceled";}).forEach(function(c){
+    rows+='<button class="cc-vault-pick-item" data-action="edit-collab" data-id="'+c.id+'"><div class="cc-vault-name">'+esc(c.partner)+'</div><div class="cc-vault-meta">Collab · '+esc(c.status)+'</div></button>';
+  });
+  S.trips.filter(function(t){return t.start&&t.end&&t.start<=iso&&iso<=t.end;}).forEach(function(t){
+    rows+='<button class="cc-vault-pick-item" data-action="view-trip" data-id="'+t.id+'"><div class="cc-vault-name">'+esc(t.name)+'</div><div class="cc-vault-meta">Trip · '+esc(fmtDate(t.start))+' – '+esc(fmtDate(t.end))+'</div></button>';
+  });
+  return '<div class="cc-modal-bg" data-action="close-calday"><div class="cc-modal" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+esc(fmtDate(iso))+'</h2><button class="cc-icon-btn" data-action="close-calday">'+ic("x")+'</button></div>'
+    +'<div class="cc-day-list">'+(rows||'<p class="cc-note">Nothing on this day.</p>')+'</div>'
+    +(S.vault.length?'<button class="cc-ghost full" data-action="cal-day-open" data-id="'+iso+'" style="margin-top:12px">'+ic("plus",14)+' Schedule from Vault on this day</button>':"")
+    +'</div></div>';
+}
+
+function sceneStageMenuModal(){
+  if(!S.sceneStageMenu) return "";
+  var parts=S.sceneStageMenu.split(":"), kind=parts[0], id=parts.slice(1).join(":");
+  var obj = kind==="vault" ? S.vault.filter(function(x){return x.id===id;})[0] : S.releases.filter(function(x){return x.id===id;})[0];
+  if(!obj) return "";
+  var eff=sceneEffectiveStage(obj, kind==="release");
+  var rows="";
+  SCENE_COLS.filter(function(s){return s!=="released";}).forEach(function(st){
+    var col=SCENE_COL_COLOR[st];
+    var cur=(eff===st);
+    rows+='<button class="cc-status-opt'+(cur?" cur":"")+'" data-action="set-scene-stage" data-id="'+S.sceneStageMenu+'" data-status="'+st+'">'
+      +'<span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<span class="cc-status-label">'+SCENE_COL_LABEL[st]+'</span>'
+      +(cur?'<span class="cc-status-check">'+ic("check",15)+'</span>':"")
+      +'</button>';
+  });
+  return '<div class="cc-modal-bg" data-action="close-scene-stage"><div class="cc-modal cc-status-sheet" data-stop="1">'
+    +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Move scene</h2><button class="cc-icon-btn" data-action="close-scene-stage">'+ic("x")+'</button></div>'
+    +'<p class="cc-note" style="margin:0 0 12px">'+esc(obj.name)+'</p>'
+    +rows
+    +(eff==="released"?'<p class="cc-note" style="margin-top:12px">Marked Released automatically — every post is Posted.</p>':"")
+    +'</div></div>';
+}
+function setSceneStage(kind,id,st){
+  var obj = kind==="vault" ? S.vault.filter(function(x){return x.id===id;})[0] : S.releases.filter(function(x){return x.id===id;})[0];
+  if(!obj) return;
+  obj.stage=st; S.sceneStageMenu=null; flash("Moved to "+SCENE_COL_LABEL[st]+".");
+  if(sb) sb.from(kind==="vault"?"vault":"releases").update({stage:st}).eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
+  render();
 }
 
 function calVaultPickModal(){
@@ -2289,7 +2462,9 @@ function render(){
     +handoffModal()
     +tplEditorModal()
     +dateEditModal()
+    +calDayModal()
     +calVaultPickModal()
+    +sceneStageMenuModal()
     +vaultScheduleModal()
     +tripViewModal()
     +tripFormModal()
@@ -2305,9 +2480,25 @@ function render(){
 /* ====================== EVENTS ====================== */
 function blankPost(){return {id:uid(),releaseId:null,title:"",date:todayStr(),platform:"OnlyFans",status:"Idea",stage:"Promo",cta:"Subscribe",caption:"",assetLink:"",results:"",assetReady:false,captionReady:false,winner:false,_new:true};}
 
+/* keep the bottom nav from getting stranded after an over-scroll */
+(function(){
+  function unstick(){
+    try{
+      var max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+      if(window.scrollY>max) window.scrollTo(0,max);
+      var n=document.querySelector(".cc-nav");
+      if(n){ n.style.transform="translate3d(0,0,0)"; void n.offsetHeight; }
+    }catch(e){}
+  }
+  var t=null;
+  window.addEventListener("scroll",function(){ clearTimeout(t); t=setTimeout(unstick,140); },{passive:true});
+  if(window.visualViewport){ window.visualViewport.addEventListener("resize",unstick); window.visualViewport.addEventListener("scroll",unstick); }
+})();
+
 document.addEventListener("click",function(e){
   var el=e.target.closest("[data-action]"); if(!el)return;
   var a=el.getAttribute("data-action"), id=el.getAttribute("data-id");
+  if(S.calDay && !/^(cal-day|close-calday|rel-to-vault|confirm)/.test(a)){ S.calDay=null; }
 
   if(a==="auth-submit"){ doAuth(); return; }
   if(a==="auth-switch"){ S.authMode=(S.authMode==="signup"?"signin":"signup"); S.authMsg=""; render(); return; }
@@ -2339,7 +2530,8 @@ document.addEventListener("click",function(e){
     var vn=($("v_name").value||"").trim();
     if(!vn){ flash("Give the scene a name first."); return; }
     var vnotes=($("v_notes")&&$("v_notes").value||"").trim();
-    addVault(vn, [], [], null, vnotes);
+    var vcollab=($("v_collab")&&$("v_collab").value)||null;
+    addVault(vn, [], [], null, vnotes, vcollab);
     S.vaultNew=false; render(); return;
   }
   if(a==="collabview"){ S.collabView=el.getAttribute("data-v"); render(); return; }
@@ -2391,7 +2583,9 @@ document.addEventListener("click",function(e){
     if(!planSel.stages.length){flash("Select at least one stage.");return;}
     var ordered=S.stages.filter(function(s){return planSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     var excl=($("p_excl")&&$("p_excl").value)||null;
-    generate(name,date,planSel.platforms.slice(),ordered,excl);
+    var pcl=S.pendingCollabLink; S.pendingCollabLink=null;
+    var gok=generate(name,date,planSel.platforms.slice(),ordered,excl,"ready",pcl);
+    if(gok && pcl && sb){ sb.from("releases").update({source_collab_id:pcl}).eq("id",S.openRelease).then(function(r){ if(r.error)sbErr(r.error); }); }
     resetPlanStages();
     return;
   }
@@ -2413,7 +2607,30 @@ document.addEventListener("click",function(e){
     flash(S.releaseDay===null ? "Release day cleared." : "Release day set to "+DAY_NAMES[S.releaseDay]+".");
     render(); return;
   }
-  if(a==="cal-day-open"){ S.calVaultPick=id; render(); return; }
+  if(a==="cal-day-view"){ S.calDay=id; render(); return; }
+  if(a==="close-calday"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.calDay=null; render(); return; }
+  if(a==="rel-to-vault"){
+    var mrid=id, mrel=S.releases.filter(function(x){return x.id===mrid;})[0]; if(!mrel) return;
+    var mposts=S.posts.filter(function(p){return p.releaseId===mrid;});
+    var mtouched=mposts.filter(function(p){return p.caption||p.assetLink||p.results;}).length;
+    ask('Move "'+mrel.name+'" back to your Vault? It comes off the calendar and its '+mposts.length+' post'+(mposts.length===1?"":"s")+' are removed.'+(mtouched?' '+mtouched+' of them have captions, links or notes that will be lost.':""),function(){ moveReleaseToVault(mrid); },"Move to Vault");
+    return;
+  }
+  if(a==="cal-day-open"){ S.calDay=null; S.calVaultPick=id; render(); return; }
+  if(a==="sceneview"){ S.sceneView=el.getAttribute("data-v"); render(); return; }
+  if(a==="toggle-released-scenes"){ S.showReleasedScenes=!S.showReleasedScenes; render(); return; }
+  if(a==="scene-stage-menu"){ S.sceneStageMenu=id; render(); return; }
+  if(a==="close-scene-stage"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.sceneStageMenu=null; render(); return; }
+  if(a==="set-scene-stage"){
+    var skind=id.split(":")[0], sid=id.split(":").slice(1).join(":");
+    setSceneStage(skind,sid,el.getAttribute("data-status"));
+    return;
+  }
+  if(a==="collab-to-vault"){
+    var cv=S.collabs.filter(function(x){return x.id===id;})[0]; if(!cv) return;
+    addVault(cv.partner, [], [], null, "", cv.id);
+    S.collabEdit=null; render(); return;
+  }
   if(a==="close-calvault"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.calVaultPick=null; render(); return; }
   if(a==="cal-vault-choose"){
     var pickedDate=S.calVaultPick;
@@ -2446,7 +2663,8 @@ document.addEventListener("click",function(e){
     var vsordered=S.stages.filter(function(s){return vaultSel.stages.indexOf(s.id)>=0;}).map(function(s){return s.id;});
     var vsexcl=($("vs_excl")&&$("vs_excl").value)||null;
     var vid=id; S.vaultSchedule=null; S.vaultSchedDate=null;
-    scheduleVaultItem(vid,vd,vaultSel.platforms.slice(),vsordered,vsexcl);
+    var vsitem=S.vault.filter(function(x){return x.id===vid;})[0];
+    scheduleVaultItem(vid,vd,vaultSel.platforms.slice(),vsordered,vsexcl,vsitem?vsitem.stage:"ready",vsitem?vsitem.sourceCollabId:null);
     return;
   }
   if(a==="vault-del"){ ask("Remove this scene from your Vault?",function(){deleteVault(id);},"Remove"); return; }
