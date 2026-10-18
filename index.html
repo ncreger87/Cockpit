@@ -794,7 +794,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v63";
+var APP_VERSION = "v64";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1462,7 +1462,7 @@ function collabEditorModal(){
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="c_notes" class="cc-input" rows="3" placeholder="Ideas, who brings what, split of content…">'+esc(c.notes||"")+'</textarea></label>'
     +'<button class="cc-primary" data-action="save-collab">'+ic("check",16)+' Save collab</button>'
     +(!isNew?'<button class="cc-ghost full" data-action="collab-to-release" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("sparkles",16)+' Turn into a release</button>'
-      +'<button class="cc-ghost full" data-action="collab-to-vault" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("vault",16)+' Save as a Vault idea</button>'
+      +'<button class="cc-ghost full" data-action="collab-to-vault" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("vault",16)+' Create scene for the Vault</button>'
       +'<button class="cc-ghost full" data-action="dup-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("layers",16)+' Duplicate collab</button>'
       +'<button class="cc-ghost danger full" data-action="del-collab" data-id="'+esc(c.id)+'" style="margin-top:10px">'+ic("trash",16)+' Delete collab</button>':"")
     +'</div></div>';
@@ -2741,6 +2741,7 @@ document.addEventListener("click",function(e){
   if(a==="collab-to-vault"){
     var cv=S.collabs.filter(function(x){return x.id===id;})[0]; if(!cv) return;
     addVault(cv.partner, [], [], null, "", cv.id);
+    flash('Scene "'+cv.partner+'" created in your Vault.');
     S.collabEdit=null; render(); return;
   }
   if(a==="close-calvault"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.calVaultPick=null; render(); return; }
