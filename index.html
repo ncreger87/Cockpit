@@ -257,6 +257,7 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-tg-col{cursor:cell;}
 .cc-timepick{display:flex;align-items:center;gap:6px;}
 .cc-timepick select{flex:1;min-width:0;}
+.cc-timepick span{color:var(--mut);font-weight:700;}
 .cc-tg-ev.st-Tentative{border:1px dashed var(--c);border-left:3px dashed var(--c);background:rgba(255,255,255,.05);background:color-mix(in srgb,var(--c) 14%,var(--bg2));}
 .cc-tg-ev.st-Shot{background:color-mix(in srgb,var(--c) 38%,var(--bg2));}
 .cc-tg-ev span{font-weight:600;}
@@ -793,7 +794,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v62";
+var APP_VERSION = "v63";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1453,10 +1454,8 @@ function collabEditorModal(){
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">'+(isNew?"Schedule a collab":"Edit collab")+'</h2><button class="cc-icon-btn" data-action="close-collab">'+ic("x")+'</button></div>'
     +'<input type="hidden" id="c_id" value="'+esc(c.id)+'">'
     +'<label class="cc-field"><span>Collab with</span><input id="c_partner" class="cc-input" value="'+esc(c.partner||"")+'" placeholder="Their name or @handle"></label>'
-    +'<div class="cc-row2">'
-      +'<label class="cc-field"><span>Date</span><input id="c_date" type="date" class="cc-input" value="'+esc(c.date||todayStr())+'"></label>'
-      +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional</span></span>'+timePicker("c_time",c.time)+'</label>'
-    +'</div>'
+    +'<label class="cc-field"><span>Date</span><input id="c_date" type="date" class="cc-input" value="'+esc(c.date||todayStr())+'"></label>'
+    +'<div class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional</span></span>'+timePicker("c_time",c.time)+'</div>'
     +'<label class="cc-field"><span>Location <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_location" class="cc-input" value="'+esc(c.location||"")+'" placeholder="Studio, city, or address"></label>'
     +'<label class="cc-field"><span>Status</span><select id="c_status" class="cc-input">'+opts+'</select></label>'
     +'<label class="cc-field"><span>Trip <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="c_trip" class="cc-input" onchange="handleCollabTripChange(this)">'+tripOpts+'</select></label>'
@@ -1980,7 +1979,7 @@ function editorModal(){
     +'<label class="cc-field"><span>Title</span><input id="f_title" class="cc-input" value="'+esc(p.title)+'" placeholder="Post title"></label>'
     +'<div class="cc-two"><label class="cc-field"><span>Date</span><input id="f_date" type="date" class="cc-input" value="'+esc(p.date)+'"></label>'
       +'<label class="cc-field"><span>Platform</span>'+sel("f_platform",p.platform,PLATFORMS.map(function(x){return x.id;}))+'</label></div>'
-    +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional, leave blank for no set time</span></span>'+timePicker("f_time",p.time)+'</label>'
+    +'<div class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional, leave blank for no set time</span></span>'+timePicker("f_time",p.time)+'</div>'
     +'<div class="cc-two"><label class="cc-field"><span>Status</span>'+sel("f_status",p.status,STATUS_ORDER)+'</label>'
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
     +'<input type="hidden" id="f_stage" value="'+esc(p.stage||"Promo")+'">'
