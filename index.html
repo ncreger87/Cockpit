@@ -254,6 +254,12 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-tg-ev span{display:block;font-size:9px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cc-dayview .cc-tg-ev{font-size:13px;padding:4px 8px;}
 .cc-dayview .cc-tg-ev span{font-size:11px;}
+.cc-tg-col{cursor:cell;}
+.cc-timepick{display:flex;align-items:center;gap:6px;}
+.cc-timepick select{flex:1;min-width:0;}
+.cc-tg-ev.st-Tentative{border:1px dashed var(--c);border-left:3px dashed var(--c);background:rgba(255,255,255,.05);background:color-mix(in srgb,var(--c) 14%,var(--bg2));}
+.cc-tg-ev.st-Shot{background:color-mix(in srgb,var(--c) 38%,var(--bg2));}
+.cc-tg-ev span{font-weight:600;}
 .cc-tg-now{position:absolute;left:0;right:0;height:2px;background:#ff453a;z-index:3;pointer-events:none;}
 .cc-tg-now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:4px;background:#ff453a;}
 
@@ -787,7 +793,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v60";
+var APP_VERSION = "v62";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1216,7 +1222,7 @@ function saveCollabFromForm(){
   if(!date){ flash("Pick a date for the shoot."); return; }
   var tripSel = $("c_trip");
   var tripId = tripSel ? (tripSel.value==="__new__" ? "" : tripSel.value) : "";
-  var c={id:id, partner:partner, date:date, time:($("c_time").value||""),
+  var c={id:id, partner:partner, date:date, time:readTime("c_time"),
     location:($("c_location").value||"").trim(), status:normStatus($("c_status").value),
     notes:($("c_notes").value||"").trim(), tripId:tripId, createdAt:Date.now()};
   var trip = tripId ? S.trips.filter(function(x){return x.id===tripId;})[0] : null;
@@ -1274,7 +1280,7 @@ function scheduleVaultItem(id,date,platforms,stageIds,exclusive,stageVal,sourceC
 }
 function savePostFromForm(){
   var id=$("f_id").value||uid();
-  var data={id:id,releaseId:$("f_relId").value||null,title:$("f_title").value.trim(),date:$("f_date").value,time:$("f_time").value||"",
+  var data={id:id,releaseId:$("f_relId").value||null,title:$("f_title").value.trim(),date:$("f_date").value,time:readTime("f_time"),
     platform:$("f_platform").value,status:$("f_status").value,stage:$("f_stage").value,cta:$("f_cta").value,
     caption:$("f_caption").value.trim(),assetLink:$("f_asset").value.trim(),results:$("f_results").value.trim(),
     assetReady:$("f_assetReady").classList.contains("on"),
@@ -1449,7 +1455,7 @@ function collabEditorModal(){
     +'<label class="cc-field"><span>Collab with</span><input id="c_partner" class="cc-input" value="'+esc(c.partner||"")+'" placeholder="Their name or @handle"></label>'
     +'<div class="cc-row2">'
       +'<label class="cc-field"><span>Date</span><input id="c_date" type="date" class="cc-input" value="'+esc(c.date||todayStr())+'"></label>'
-      +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_time" type="time" class="cc-input" value="'+esc(c.time||"")+'"></label>'
+      +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional</span></span>'+timePicker("c_time",c.time)+'</label>'
     +'</div>'
     +'<label class="cc-field"><span>Location <span style="color:var(--mut2);font-weight:400">— optional</span></span><input id="c_location" class="cc-input" value="'+esc(c.location||"")+'" placeholder="Studio, city, or address"></label>'
     +'<label class="cc-field"><span>Status</span><select id="c_status" class="cc-input">'+opts+'</select></label>'
@@ -1974,7 +1980,7 @@ function editorModal(){
     +'<label class="cc-field"><span>Title</span><input id="f_title" class="cc-input" value="'+esc(p.title)+'" placeholder="Post title"></label>'
     +'<div class="cc-two"><label class="cc-field"><span>Date</span><input id="f_date" type="date" class="cc-input" value="'+esc(p.date)+'"></label>'
       +'<label class="cc-field"><span>Platform</span>'+sel("f_platform",p.platform,PLATFORMS.map(function(x){return x.id;}))+'</label></div>'
-    +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional, leave blank for no set time</span></span><input id="f_time" type="time" class="cc-input" value="'+esc(p.time||"")+'"></label>'
+    +'<label class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional, leave blank for no set time</span></span>'+timePicker("f_time",p.time)+'</label>'
     +'<div class="cc-two"><label class="cc-field"><span>Status</span>'+sel("f_status",p.status,STATUS_ORDER)+'</label>'
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
     +'<input type="hidden" id="f_stage" value="'+esc(p.stage||"Promo")+'">'
@@ -2014,6 +2020,19 @@ function dateEditModal(){
     +'</div></div>';
 }
 
+function timePicker(id,val){
+  var mn=hmMins(val), h12="", mm="", ap="AM";
+  if(mn!==null){ var h=Math.floor(mn/60); mm=mn%60; ap=h>=12?"PM":"AM"; h12=h%12||12; }
+  var ho='<option value="">—</option>'; for(var h=1;h<=12;h++) ho+='<option'+(h===h12?" selected":"")+'>'+h+'</option>';
+  var mins=[]; for(var m=0;m<60;m+=5) mins.push(m); if(mm!=="" && mins.indexOf(mm)<0){ mins.push(mm); mins.sort(function(a,b){return a-b;}); }
+  var mo=""; mins.forEach(function(m){ mo+='<option value="'+m+'"'+(m===mm?" selected":"")+'>'+String(m).padStart(2,"0")+'</option>'; });
+  return '<div class="cc-timepick" id="'+id+'"><select class="cc-input" id="'+id+'_h">'+ho+'</select><span>:</span><select class="cc-input" id="'+id+'_m">'+mo+'</select><select class="cc-input" id="'+id+'_p"><option'+(ap==="AM"?" selected":"")+'>AM</option><option'+(ap==="PM"?" selected":"")+'>PM</option></select></div>';
+}
+function readTime(id){
+  var h=$(id+"_h"); if(!h || !h.value) return "";
+  var hh=Number(h.value)%12; if($(id+"_p").value==="PM") hh+=12;
+  return String(hh).padStart(2,"0")+":"+String(Number($(id+"_m").value)).padStart(2,"0");
+}
 var PLAT_COLOR={OnlyFans:"#3aa8e8",JustForFans:"#d8695f",X:"#b9b5c6",Bluesky:"#5b9bf0",Reddit:"#f08a4b",Instagram:"#d96ba8",TikTok:"#3fd0c4"};
 function hmMins(t){ var m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m ? (+m[1])*60+(+m[2]) : null; }
 function fmtMins(mins){ var h=Math.floor(mins/60)%24, mm=mins%60; return (h%12||12)+(mm?":"+String(mm).padStart(2,"0"):"")+(h>=12?" PM":" AM"); }
@@ -2029,7 +2048,7 @@ function adChip(it,big){
   var act, id, col, label;
   if(it.kind==="rel"){ act="open-rel"; id=it.rel.id; col="var(--accent)"; label=it.rel.name; }
   else if(it.kind==="trip"){ act="view-trip"; id=it.trip.id; col="var(--trip)"; label="✈ "+it.trip.name; }
-  else if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; col=COLLAB_COLOR[it.collab.status]||"var(--collab)"; label=it.collab.partner+(big?" · collab, no time set":""); }
+  else if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; col=COLLAB_COLOR[it.collab.status]||"var(--collab)"; label=(it.collab.status==="Shot"?"✓ ":"")+it.collab.partner+" · "+it.collab.status+(big?" · no time set":""); }
   else { act="edit"; id=it.post.id; col=PLAT_COLOR[it.post.platform]||"#888"; label=it.post.title+(big?" · "+it.post.platform:""); }
   return '<div class="cc-ad" data-action="'+act+'" data-id="'+esc(id)+'" style="--c:'+col+'">'+esc(label)+'</div>';
 }
@@ -2073,13 +2092,13 @@ function timeGrid(isos,big,maxH){
   var body='<div class="cc-tg-row" style="grid-template-columns:'+cols+'">'+gut;
   isos.forEach(function(iso,i){
     var d=data[i]; layoutLanes(d.timed);
-    var col='<div class="cc-tg-col" style="height:'+total+'px;background-size:100% '+H+'px,100% '+(H/2)+'px">';
+    var col='<div class="cc-tg-col" data-action="cal-slot" data-id="'+iso+'" data-sh="'+sH+'" data-h="'+H+'" style="height:'+total+'px;background-size:100% '+H+'px,100% '+(H/2)+'px">';
     d.timed.forEach(function(it){
       var top=(it.start-sH*60)/60*H, hh=Math.max(it.dur/60*H-2,big?24:20);
-      var w=100/it.lanes, left=it.lane*w, act, id, c, t1, t2;
-      if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; c=COLLAB_COLOR[it.collab.status]||"#79b8f3"; t1=it.collab.partner; t2="Collab · "+fmtMins(it.start); }
+      var w=100/it.lanes, left=it.lane*w, act, id, c, t1, t2, stc="";
+      if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; c=COLLAB_COLOR[it.collab.status]||"#79b8f3"; t1=(it.collab.status==="Shot"?"✓ ":"")+it.collab.partner; t2=(n>3?({Tentative:"Tent.",Confirmed:"Conf.",Shot:"Shot"}[it.collab.status]||it.collab.status):it.collab.status+" · "+fmtMins(it.start)); stc=" st-"+it.collab.status; }
       else { act="edit"; id=it.post.id; c=PLAT_COLOR[it.post.platform]||"#888"; t1=it.post.title; t2=it.post.platform+" · "+fmtMins(it.start); }
-      col+='<div class="cc-tg-ev" data-action="'+act+'" data-id="'+esc(id)+'" style="--c:'+c+';top:'+top+'px;height:'+hh+'px;left:calc('+left+'% + 1px);width:calc('+w+'% - 3px)"><b>'+esc(t1)+'</b>'+(big||n<=3?'<span>'+esc(t2)+'</span>':"")+'</div>';
+      col+='<div class="cc-tg-ev'+stc+'" data-action="'+act+'" data-id="'+esc(id)+'" style="--c:'+c+';top:'+top+'px;height:'+hh+'px;left:calc('+left+'% + 1px);width:calc('+w+'% - 3px)"><b>'+esc(t1)+'</b>'+(big||n<=3||it.kind==="collab"?'<span>'+esc(t2)+'</span>':"")+'</div>';
     });
     if(iso===tStr && nowM>=sH*60){ col+='<div class="cc-tg-now" style="top:'+((nowM-sH*60)/60*H)+'px"></div>'; }
     col+='</div>';
@@ -2097,7 +2116,7 @@ function multiDayView(){
   return '<div class="cc-cal"><div class="cc-cal-head"><div class="cc-cal-title">'+title+'</div>'
     +'<div class="cc-cal-nav"><button data-action="cal-span-nav" data-dir="-1">'+ic("chevL")+'</button><button data-action="cal-span-today">'+ic("target")+'</button><button data-action="cal-span-nav" data-dir="1">'+ic("chevR")+'</button></div></div>'
     +timeGrid(isos,false,"68vh")
-    +'<p class="cc-note" style="margin:10px 4px 0">Tap a day\'s number for the full-day view. Posts without a set time show in the all-day row.</p></div>';
+    +'<p class="cc-note" style="margin:10px 4px 0">Dashed = Tentative, solid = Confirmed, ✓ = Shot. Tap an empty time slot to schedule a collab there. Tap a day\'s number for the full-day view. Anything without a set time shows in the all-day row.</p></div>';
 }
 function calDayModal(){
   if(!S.calDay)return"";
@@ -2105,6 +2124,7 @@ function calDayModal(){
   return '<div class="cc-modal-bg" data-action="close-calday"><div class="cc-modal cc-dayview" data-stop="1">'
     +'<div class="cc-modal-head"><div style="display:flex;align-items:center;gap:6px"><button class="cc-icon-btn" data-action="cal-day-nav" data-dir="-1">'+ic("chevL")+'</button><h2 class="cc-h2" style="margin:0">'+esc(fmtDate(iso))+'</h2><button class="cc-icon-btn" data-action="cal-day-nav" data-dir="1">'+ic("chevR")+'</button></div><button class="cc-icon-btn" data-action="close-calday">'+ic("x")+'</button></div>'
     +timeGrid([iso],true,"58vh")
+    +'<p class="cc-note" style="margin:8px 2px 0">Tap an empty time slot to schedule a collab.</p>'
     +(S.vault.length?'<button class="cc-ghost full" data-action="cal-day-open" data-id="'+iso+'" style="margin-top:12px">'+ic("plus",14)+' Schedule from Vault on this day</button>':"")
     +'</div></div>';
 }
@@ -2630,6 +2650,12 @@ document.addEventListener("click",function(e){
   if(a==="close-status"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.statusMenu=null; render(); return; }
   if(a==="set-status"){ setStatus(id, el.getAttribute("data-status")); return; }
   if(a==="postnow"){ var pp=S.posts.filter(function(x){return x.id===id;})[0]; if(pp){S.handoff=Object.assign({},pp);render();} return; }
+  if(a==="cal-slot"){
+    var rc=el.getBoundingClientRect(), shh=Number(el.getAttribute("data-sh")), hh=Number(el.getAttribute("data-h"));
+    var mn=Math.floor(((e.clientY-rc.top)/hh*60+shh*60)/30)*30; mn=Math.max(0,Math.min(1410,mn));
+    var tm=String(Math.floor(mn/60)).padStart(2,"0")+":"+String(mn%60).padStart(2,"0");
+    S.calDay=null; S.collabEdit={id:uid(),partner:"",date:id,time:tm,location:"",status:"Tentative",notes:"",tripId:""}; render(); return;
+  }
   if(a==="add-collab"){ S.collabEdit={id:uid(),partner:"",date:todayStr(),time:"",location:"",status:"Tentative",notes:"",tripId:""}; render(); return; }
   if(a==="add-collab-for-trip"){ var trF=S.trips.filter(function(x){return x.id===id;})[0]; S.tripView=null; S.collabEdit={id:uid(),partner:"",date:(trF&&trF.start)?trF.start:todayStr(),time:"",location:"",status:"Tentative",notes:"",tripId:id}; render(); return; }
   if(a==="edit-collab"){ var ec=S.collabs.filter(function(x){return x.id===id;})[0]; if(ec){ S.collabEdit=Object.assign({},ec); render(); } return; }
