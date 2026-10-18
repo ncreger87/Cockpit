@@ -787,7 +787,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v59";
+var APP_VERSION = "v60";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -2768,7 +2768,7 @@ document.addEventListener("click",function(e){
   if(a==="calfilter"){ S.calPlat=el.getAttribute("data-v"); render(); return; }
   if(a==="cal-layer"){ var lk=el.getAttribute("data-v"); S.calLayers[lk]=!S.calLayers[lk]; try{localStorage.setItem("cc_cal_layers",JSON.stringify(S.calLayers));}catch(e){} render(); return; }
   if(a==="cal-span"){ var sv=el.getAttribute("data-v"); S.calSpan=sv; if(sv==="7"){ var an=S.calAnchor||todayStr(); var dw=new Date(an+"T00:00:00").getDay(); S.calAnchor=addDays(an,-dw); } else if(sv==="3"){ S.calAnchor=S.calAnchor||todayStr(); } render(); return; }
-  if(a==="cal-span-nav"){ var step=S.calSpan==="7"?7:3; S.calAnchor=addDays(S.calAnchor||todayStr(),Number(el.getAttribute("data-dir"))*step); render(); return; }
+  if(a==="cal-span-nav"){ var step=S.calSpan==="7"?7:1; S.calAnchor=addDays(S.calAnchor||todayStr(),Number(el.getAttribute("data-dir"))*step); render(); return; }
   if(a==="cal-span-today"){ var t0=todayStr(); S.calAnchor=S.calSpan==="7"?addDays(t0,-new Date(t0+"T00:00:00").getDay()):t0; render(); return; }
   if(a==="cal-day-nav"){ S.calDay=addDays(S.calDay,Number(el.getAttribute("data-dir"))); render(); return; }
   if(a==="wiz-next"){ S.wiz.step++; render(); return; }
