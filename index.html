@@ -569,6 +569,12 @@ var PLATFORM_URL = {
   Instagram:"https://www.instagram.com/",
   TikTok:"https://www.tiktok.com/upload"
 };
+PLATFORM_LIMIT.Threads=500;
+PLATFORM_URL.Fansly="https://fansly.com/"; PLATFORM_URL.Patreon="https://www.patreon.com/"; PLATFORM_URL.Snapchat="https://www.snapchat.com/";
+PLATFORM_URL.Telegram="https://web.telegram.org/"; PLATFORM_URL.Threads="https://www.threads.net/"; PLATFORM_URL.YouTube="https://studio.youtube.com/"; PLATFORM_URL.Facebook="https://www.facebook.com/";
+var SUGGEST_PLATS=["OnlyFans","Fansly","JustForFans","Patreon","X","Bluesky","Reddit","Instagram","TikTok","Snapchat","Telegram","Threads","YouTube","Facebook"];
+var DEFAULT_MY=["OnlyFans","JustForFans","X","Bluesky","Reddit","Instagram","TikTok"];
+var KNOWN_GROUP={OnlyFans:"paid",JustForFans:"paid",Fansly:"paid",Patreon:"paid",X:"micro",Bluesky:"micro",Threads:"micro",Reddit:"reddit"};
 var PG = {}; PLATFORMS.forEach(function(p){PG[p.id]=p.group;});
 var ALL_PLAT = PLATFORMS.map(function(p){return p.id;});
 var DEFAULT_STAGES = [
@@ -786,7 +792,7 @@ var S = {
   vault:[], vaultSchedule:null, handoff:null,
   calVaultPick:null, vaultSchedDate:null, calDay:null,
   sceneStageMenu:null, sceneView:"list", showReleasedScenes:false, pendingCollabLink:null,
-  releaseDay:null,
+  releaseDay:null, myPlatforms:null,
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
   collabView:"list", collabStatusMenu:null,
@@ -794,7 +800,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v64";
+var APP_VERSION = "v65";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -845,6 +851,7 @@ function fetchAll(){
     S.ledgerExpenses = (eres && !eres.error && eres.data) ? eres.data : [];
     // campaign template + onboarding flag
     var srow = (setres && !setres.error && setres.data && setres.data[0]) ? setres.data[0] : null;
+    if(srow && Array.isArray(srow.my_platforms) && srow.my_platforms.length){ S.myPlatforms=srow.my_platforms.slice(); applyPlatforms(S.myPlatforms); planSel.platforms=ALL_PLAT.slice(); }
     if(srow && Array.isArray(srow.stages) && srow.stages.length){
       S.stages = srow.stages.map(function(s){return {id:s.id||uid(),label:s.label,offset:Number(s.offset)||0,platforms:Array.isArray(s.platforms)?s.platforms.slice():ALL_PLAT.slice()};});
     } else if(!setres || !setres.error) {
@@ -1765,6 +1772,9 @@ function moreView(){
       +DAY_ABBR.map(function(d,i){ return '<button class="cc-chip'+(S.releaseDay===i?" on":"")+'" data-action="set-relday" data-id="'+i+'">'+d+'</button>'; }).join("")
       +(S.releaseDay!==null?'<button class="cc-chip" data-action="set-relday" data-id="none">Clear</button>':"")
     +'</div>'
+    +'<h3 class="cc-sub-h">My Platforms</h3>'
+    +'<p class="cc-note" style="margin:0 4px 10px">Pick the platforms you post on. Every template, post and calendar filter uses this list. Removing one keeps your old posts.</p>'
+    +platEditorHTML()
     +'<h3 class="cc-sub-h">My Campaign Template'+(S.templates.length>1?"s ("+S.templates.length+")":"")+'</h3>'
     +'<p class="cc-note" style="margin:0 4px 10px">These stages drive every new release.'
       +(S.templates.length>1?' All your templates are listed below — tap one to make it active. The active one is what Plan uses.':' Edit them to match how you run a drip — rename, change timing, add or remove steps.')+'</p>'
@@ -1978,7 +1988,7 @@ function editorModal(){
     +'<input type="hidden" id="f_id" value="'+esc(p.id)+'"><input type="hidden" id="f_relId" value="'+esc(p.releaseId||"")+'">'
     +'<label class="cc-field"><span>Title</span><input id="f_title" class="cc-input" value="'+esc(p.title)+'" placeholder="Post title"></label>'
     +'<div class="cc-two"><label class="cc-field"><span>Date</span><input id="f_date" type="date" class="cc-input" value="'+esc(p.date)+'"></label>'
-      +'<label class="cc-field"><span>Platform</span>'+sel("f_platform",p.platform,PLATFORMS.map(function(x){return x.id;}))+'</label></div>'
+      +'<label class="cc-field"><span>Platform</span>'+sel("f_platform",p.platform,PLATFORMS.map(function(x){return x.id;}).concat((!p._new && p.platform && ALL_PLAT.indexOf(p.platform)<0)?[p.platform]:[]))+'</label></div>'
     +'<div class="cc-field"><span>Time <span style="color:var(--mut2);font-weight:400">— optional, leave blank for no set time</span></span>'+timePicker("f_time",p.time)+'</div>'
     +'<div class="cc-two"><label class="cc-field"><span>Status</span>'+sel("f_status",p.status,STATUS_ORDER)+'</label>'
       +'<label class="cc-field"><span>CTA</span>'+sel("f_cta",p.cta,CTAS)+'</label></div>'
@@ -2048,7 +2058,7 @@ function adChip(it,big){
   if(it.kind==="rel"){ act="open-rel"; id=it.rel.id; col="var(--accent)"; label=it.rel.name; }
   else if(it.kind==="trip"){ act="view-trip"; id=it.trip.id; col="var(--trip)"; label="✈ "+it.trip.name; }
   else if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; col=COLLAB_COLOR[it.collab.status]||"var(--collab)"; label=(it.collab.status==="Shot"?"✓ ":"")+it.collab.partner+" · "+it.collab.status+(big?" · no time set":""); }
-  else { act="edit"; id=it.post.id; col=PLAT_COLOR[it.post.platform]||"#888"; label=it.post.title+(big?" · "+it.post.platform:""); }
+  else { act="edit"; id=it.post.id; col=platColor(it.post.platform); label=it.post.title+(big?" · "+it.post.platform:""); }
   return '<div class="cc-ad" data-action="'+act+'" data-id="'+esc(id)+'" style="--c:'+col+'">'+esc(label)+'</div>';
 }
 function layoutLanes(items){
@@ -2096,7 +2106,7 @@ function timeGrid(isos,big,maxH){
       var top=(it.start-sH*60)/60*H, hh=Math.max(it.dur/60*H-2,big?24:20);
       var w=100/it.lanes, left=it.lane*w, act, id, c, t1, t2, stc="";
       if(it.kind==="collab"){ act="edit-collab"; id=it.collab.id; c=COLLAB_COLOR[it.collab.status]||"#79b8f3"; t1=(it.collab.status==="Shot"?"✓ ":"")+it.collab.partner; t2=(n>3?({Tentative:"Tent.",Confirmed:"Conf.",Shot:"Shot"}[it.collab.status]||it.collab.status):it.collab.status+" · "+fmtMins(it.start)); stc=" st-"+it.collab.status; }
-      else { act="edit"; id=it.post.id; c=PLAT_COLOR[it.post.platform]||"#888"; t1=it.post.title; t2=it.post.platform+" · "+fmtMins(it.start); }
+      else { act="edit"; id=it.post.id; c=platColor(it.post.platform); t1=it.post.title; t2=it.post.platform+" · "+fmtMins(it.start); }
       col+='<div class="cc-tg-ev'+stc+'" data-action="'+act+'" data-id="'+esc(id)+'" style="--c:'+c+';top:'+top+'px;height:'+hh+'px;left:calc('+left+'% + 1px);width:calc('+w+'% - 3px)"><b>'+esc(t1)+'</b>'+(big||n<=3||it.kind==="collab"?'<span>'+esc(t2)+'</span>':"")+'</div>';
     });
     if(iso===tStr && nowM>=sH*60){ col+='<div class="cc-tg-now" style="top:'+((nowM-sH*60)/60*H)+'px"></div>'; }
@@ -2215,6 +2225,68 @@ var TIMING_PRESETS = [
   {key:"after",label:"Day after",offset:3}
 ];
 var PAID_PLATS = PLATFORMS.filter(function(p){return p.group==="paid";}).map(function(p){return p.id;});
+/* ===== Custom platforms: the list lives in S.myPlatforms; PLATFORMS/ALL_PLAT/PG/PAID_PLATS are rebuilt in place from it ===== */
+function applyPlatforms(list){
+  PLATFORMS.length=0; ALL_PLAT.length=0; PAID_PLATS.length=0;
+  Object.keys(PG).forEach(function(k){ delete PG[k]; });
+  list.forEach(function(n){
+    var g=KNOWN_GROUP[n]||"social";
+    PLATFORMS.push({id:n,group:g}); ALL_PLAT.push(n); PG[n]=g; if(g==="paid") PAID_PLATS.push(n);
+  });
+}
+function parsePlatNames(txt){
+  var out=[];
+  String(txt||"").split(/[,;\n]+/).forEach(function(x){
+    var n=x.replace(/\s+/g," ").trim().slice(0,24); if(!n) return;
+    var hit=SUGGEST_PLATS.filter(function(p){return p.toLowerCase()===n.toLowerCase();})[0]; if(hit) n=hit;
+    if(out.map(function(o){return o.toLowerCase();}).indexOf(n.toLowerCase())<0) out.push(n);
+  });
+  return out;
+}
+function setMyPlatforms(list){
+  var old=ALL_PLAT.slice();
+  list=list.slice(0,20);
+  if(!list.length){ flash("Keep at least one platform."); return false; }
+  var added=list.filter(function(p){return old.indexOf(p)<0;});
+  S.myPlatforms=list.slice(); applyPlatforms(list);
+  function fix(stages){ (stages||[]).forEach(function(st){
+    var pl=(st.platforms||[]).filter(function(p){return list.indexOf(p)>=0;});
+    added.forEach(function(p){ if(pl.indexOf(p)<0) pl.push(p); });
+    st.platforms=list.filter(function(p){return pl.indexOf(p)>=0;});
+    if(!st.platforms.length) st.platforms=list.slice();
+  }); }
+  fix(S.stages); (S.templates||[]).forEach(function(t){ fix(t.stages); });
+  function keep(arr){ var k=arr.filter(function(p){return list.indexOf(p)>=0;}); added.forEach(function(p){ if(k.indexOf(p)<0)k.push(p); }); return k.length?k:list.slice(); }
+  planSel.platforms=keep(planSel.platforms); vaultSel.platforms=keep(vaultSel.platforms);
+  if(S.wiz && S.wiz.answers){ Object.keys(S.wiz.answers).forEach(function(k){ S.wiz.answers[k].platforms=keep(S.wiz.answers[k].platforms); }); }
+  if(S.calPlat!=="all" && list.indexOf(S.calPlat)<0) S.calPlat="all";
+  if(sb && S.user){
+    syncActiveTemplateStages();
+    sb.from("settings").upsert({user_id:S.user.id, my_platforms:S.myPlatforms, stages:S.stages, templates:templatesPayload(), updated_at:new Date().toISOString()},{onConflict:"user_id"}).then(function(r){ if(r.error)sbErr(r.error); });
+  }
+  return true;
+}
+function platEditorHTML(){
+  var cur=ALL_PLAT.slice();
+  var have=cur.map(function(p){
+    return '<button class="cc-pill on" data-action="plat-remove" data-id="'+esc(p)+'">'+esc(p)+' <span style="opacity:.7">✕</span></button>';
+  }).join("");
+  var sug=SUGGEST_PLATS.filter(function(p){return cur.indexOf(p)<0;}).map(function(p){
+    return '<button class="cc-pill sm" data-action="plat-add" data-id="'+esc(p)+'">＋ '+esc(p)+'</button>';
+  }).join("");
+  return '<div class="cc-wrap" style="margin-bottom:8px">'+have+'</div>'
+    +(sug?'<div class="cc-note" style="margin:6px 4px 6px">Quick add:</div><div class="cc-wrap" style="margin-bottom:10px">'+sug+'</div>':"")
+    +'<div class="cc-note" style="margin:6px 4px 6px">Or type your own, separated by commas:</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:6px"><input id="plat_input" class="cc-input" style="flex:1;min-width:0" placeholder="e.g. MyClub, Fansly, Kick" autocapitalize="words">'
+    +'<button class="cc-ghost" data-action="plat-add-custom">Add</button></div>'
+    +'<button class="cc-link-btn" data-action="plat-reset" style="margin:0 4px 6px">Reset to default list</button>';
+}
+var PLAT_PALETTE=["#e3a857","#7fc8a9","#c58ae6","#e57a7a","#6aa9e0","#d9d36a","#7ad3d3","#e08fb5"];
+function platColor(p){
+  if(PLAT_COLOR[p]) return PLAT_COLOR[p];
+  var h=0; for(var i=0;i<p.length;i++) h=(h*31+p.charCodeAt(i))>>>0;
+  return PLAT_PALETTE[h%PLAT_PALETTE.length];
+}
 var SOCIAL_PLATS = ["X","Bluesky"];
 
 // Each post type the wizard asks about. defaults reflect the user's real workflow.
@@ -2294,6 +2366,8 @@ function wizardOverlay(){
       +'<h2 class="cc-intro-title">What day do you drop scenes?</h2>'
       +'<p class="cc-intro-body" style="margin-bottom:16px">Most creators release on the same day each week. Pick yours and every step below will show the weekday it lands on — so "3 days before" reads as the day you\'ll actually post. <span style="color:var(--mut2)">Skip if it varies.</span></p>'
       +'<div class="cc-wrap">'+dayChips+'</div>'
+      +'<div class="cc-wiz-lbl" style="margin:18px 0 6px">Which platforms do you post on?</div>'
+      +platEditorHTML()
       +'<div class="cc-idots" style="margin-top:18px">'+dots+'</div>'
       +'<div class="cc-wiz-nav"><button class="cc-ghost" data-action="wiz-back">Back</button>'
       +'<button class="cc-primary" data-action="wiz-next" style="flex:1">Next</button></div>';
@@ -2584,7 +2658,7 @@ function render(){
 }
 
 /* ====================== EVENTS ====================== */
-function blankPost(){return {id:uid(),releaseId:null,title:"",date:todayStr(),time:"",platform:"OnlyFans",status:"Idea",stage:"Promo",cta:"Subscribe",caption:"",assetLink:"",results:"",assetReady:false,captionReady:false,winner:false,_new:true};}
+function blankPost(){return {id:uid(),releaseId:null,title:"",date:todayStr(),time:"",platform:(ALL_PLAT[0]||"OnlyFans"),status:"Idea",stage:"Promo",cta:"Subscribe",caption:"",assetLink:"",results:"",assetReady:false,captionReady:false,winner:false,_new:true};}
 
 /* keep the bottom nav from getting stranded after an over-scroll */
 (function(){
@@ -2806,6 +2880,15 @@ document.addEventListener("click",function(e){
   }
   if(a==="wiz-done"){ finishWizard(); return; }
   if(a==="wiz-relday"){ S.releaseDay = (S.releaseDay===Number(id)) ? null : Number(id); render(); return; }
+  if(a==="plat-add"){ if(setMyPlatforms(ALL_PLAT.concat([id]))) render(); return; }
+  if(a==="plat-remove"){ if(setMyPlatforms(ALL_PLAT.filter(function(p){return p!==id;}))) render(); return; }
+  if(a==="plat-add-custom"){
+    var names=parsePlatNames(($("plat_input")||{}).value); if(!names.length){ flash("Type a platform name first."); return; }
+    var cur2=ALL_PLAT.slice(), lc=cur2.map(function(x){return x.toLowerCase();});
+    names.forEach(function(n){ if(lc.indexOf(n.toLowerCase())<0){ cur2.push(n); lc.push(n.toLowerCase()); } });
+    if(setMyPlatforms(cur2)){ flash("Platforms updated."); render(); } return;
+  }
+  if(a==="plat-reset"){ if(setMyPlatforms(DEFAULT_MY.slice())){ flash("Platform list reset."); render(); } return; }
   if(a==="wiz-yes"){ var tt=S.wiz.types[S.wiz.step-2]; S.wiz.answers[tt.key].on=true; render(); return; }
   if(a==="wiz-no"){ var tt2=S.wiz.types[S.wiz.step-2]; S.wiz.answers[tt2.key].on=false; render(); return; }
   if(a==="wiz-time"){ var tt3=S.wiz.types[S.wiz.step-2]; var ans=S.wiz.answers[tt3.key]; var tk=el.getAttribute("data-k"); var ix=ans.times.indexOf(tk); if(ix>=0)ans.times.splice(ix,1); else ans.times.push(tk); render(); return; }
