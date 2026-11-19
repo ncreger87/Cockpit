@@ -800,7 +800,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v65";
+var APP_VERSION = "v66";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1691,6 +1691,7 @@ function releaseDetail(){
       +'<button class="cc-ghost" data-action="complete-scene" data-id="'+r.id+'">'+ic("check")+' Mark all posted</button>'
     +'</div>'
     +groups
+    +'<button class="cc-primary full" data-action="add-rel-post" data-id="'+r.id+'" style="margin-top:14px">'+ic("plus",16)+' Add a post to this campaign</button>'
     +'<button class="cc-ghost full" data-action="copy-captions" data-id="'+r.id+'" style="margin-top:10px">'+ic("copy")+' Copy all captions</button>'
     +'<button class="cc-ghost full" data-action="reschedule-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("clock")+' Shift all dates</button>'
     +'<button class="cc-ghost full" data-action="dup-rel" data-id="'+r.id+'" style="margin-top:10px">'+ic("layers")+' Duplicate this campaign</button>'
@@ -2931,6 +2932,11 @@ document.addEventListener("click",function(e){
     return;
   }
   if(a==="tpl-activate"){ switchTemplate(id); return; }
+  if(a==="add-rel-post"){
+    var rl=S.releases.filter(function(x){return x.id===id;})[0]; if(!rl) return;
+    var np=blankPost(); np.releaseId=id; np.title=rl.name+" — "; np.date=rl.date||todayStr();
+    S.editing=np; render(); return;
+  }
   if(a==="dup-post"){ duplicatePost(id); return; }
   if(a==="dup-rel"){ S.dupRelease=id; render(); return; }
   if(a==="copy-captions"){ copyReleaseCaptions(id); return; }
