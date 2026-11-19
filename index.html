@@ -336,6 +336,23 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-postnow{display:flex;align-items:center;gap:6px;background:var(--accent);color:#1a120a;border:none;
   font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap;}
 .cc-postnow:active{transform:scale(.95);}
+/* vault kanban */
+.cc-kan{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 16px;-webkit-overflow-scrolling:touch;align-items:flex-start;margin-top:4px;}
+.cc-kan-col{flex:0 0 min(78vw,290px);scroll-snap-align:start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:16px;padding:12px 10px 16px;min-height:170px;transition:outline-color .12s;outline:2px solid transparent;box-sizing:border-box;}
+.cc-kan-col.over{outline-color:var(--accent);}
+.cc-kan-col.no{outline:2px dashed #c0566a;}
+.cc-kan-col.drop-end .cc-kan-stack{box-shadow:inset 0 -3px 0 var(--accent);}
+.cc-kan-stack{padding-top:2px;min-height:60px;}
+.cc-kan-card{position:relative;display:flex;align-items:flex-start;height:66px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:-16px;box-shadow:0 -3px 8px rgba(0,0,0,.3);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;box-sizing:border-box;overflow:hidden;}
+.cc-kan-card:first-child{margin-top:0;}
+.cc-kan-card:active{background:var(--card2);}
+.cc-kan-card .main{flex:1;min-width:0;padding:9px 4px 0 14px;}
+.cc-kan-dot{width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--mut);cursor:pointer;margin:2px 2px 0 0;}
+.cc-kan-card.dragging{opacity:.3;}
+.cc-kan-card.drop-before::before{content:"";position:absolute;left:8px;right:8px;top:0;height:3px;background:var(--accent);border-radius:3px;z-index:2;}
+.cc-kan-ghost{position:fixed;z-index:9999;pointer-events:none;margin:0 !important;transform:rotate(2deg) scale(1.03);box-shadow:0 14px 30px rgba(0,0,0,.55);opacity:.96;}
+body.cc-dragging{user-select:none;-webkit-user-select:none;}
+.cc-chip.vstage{flex:1;text-align:center;}
 /* collab board */
 .cc-board-col{margin-top:16px;}
 .cc-board-head{display:flex;align-items:center;gap:9px;padding:0 4px 9px;}
@@ -587,7 +604,7 @@ var DEFAULT_STAGES = [
 var STATUS_ORDER = ["Idea","Draft","Ready","Scheduled","Posted","Reviewed"];
 var STATUS_COLOR = {Idea:"#8A8A99",Draft:"#E0A23C",Ready:"#3FB68B",Scheduled:"#5B8DEF",Posted:"#9B7BE8",Reviewed:"#6B6B78"};
 var SCENE_COLS=["idea","editing","ready","released"];
-var SCENE_COL_LABEL={idea:"Idea",editing:"Needs Editing",ready:"Ready to Post",released:"Released"};
+var SCENE_COL_LABEL={idea:"Idea",editing:"Shot, needs editing",ready:"Ready to Post",released:"Released"};
 var SCENE_COL_COLOR={idea:"#9b96a9",editing:"#E0A23C",ready:"#5B8DEF",released:"#3FB68B"};
 function sceneEffectiveStage(obj,isRelease){
   if(isRelease){
@@ -610,44 +627,42 @@ function sceneBadges(sc){
   if(sc.exclusive) bits.push(ic("lock",11)+" "+esc(sc.exclusive)+" exclusive");
   return bits.join(' <span class="cc-dim">·</span> ');
 }
-function sceneBoardCard(sc){
-  var col=SCENE_COL_COLOR[sc.stage]||"#888";
+function sceneOrderLoad(){ try{ return JSON.parse(localStorage.getItem("cc_scene_order")||"{}")||{}; }catch(e){ return {}; } }
+function sceneOrderSave(m){ try{ localStorage.setItem("cc_scene_order",JSON.stringify(m)); }catch(e){} }
+function sceneKanCard(sc){
   var openAction = sc.kind==="release" ? "open-rel" : "vault-schedule";
-  return '<div class="cc-board-card">'
-    +'<div class="cc-board-card-main" data-action="'+openAction+'" data-id="'+sc.id+'">'
-      +'<div class="cc-board-name">'+esc(sc.name)+'</div>'
-      +'<div class="cc-board-meta">'+sceneBadges(sc)+'</div>'
-    +'</div>'
-    +(sc.stage!=="released"?'<button class="cc-board-move" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" title="Move to another stage">'
-      +'<span class="cc-status-dot" style="background:'+col+'"></span>'+ic("chevR",14)+'</button>':'<span class="cc-board-move" style="cursor:default"><span class="cc-status-dot" style="background:'+col+'"></span></span>')
+  return '<div class="cc-kan-card" data-sid="'+sc.id+'" data-kind="'+sc.kind+'"'+(sc.stage!=="released"?' data-drag="1"':'')+' data-action="'+openAction+'" data-id="'+sc.id+'">'
+    +'<div class="main"><div class="cc-board-name">'+esc(sc.name)+'</div><div class="cc-board-meta">'+sceneBadges(sc)+'</div></div>'
+    +'<button class="cc-kan-dot" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" aria-label="Scene options">'+ic("more",18)+'</button>'
   +'</div>';
 }
 function sceneBoard(){
-  var all=allScenes(), out="";
+  var all=allScenes(), ord=sceneOrderLoad(), out='<div class="cc-kan">';
   SCENE_COLS.forEach(function(st){
     var col=SCENE_COL_COLOR[st];
-    var inCol=all.filter(function(sc){return sc.stage===st;}).sort(function(a,b){return (a.date||"9999").localeCompare(b.date||"9999");});
-    out+='<div class="cc-board-col"><div class="cc-board-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
-      +'<span class="cc-board-title">'+SCENE_COL_LABEL[st]+'</span><span class="cc-board-count">'+inCol.length+'</span></div>';
-    if(inCol.length){ inCol.forEach(function(sc){ out+=sceneBoardCard(sc); }); }
+    var inCol=all.filter(function(sc){return sc.stage===st;});
+    var total=inCol.length;
+    if(st==="released"){
+      inCol.sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
+      if(!S.showReleasedScenes) inCol=inCol.slice(0,5);
+    } else {
+      inCol.sort(function(a,b){
+        var ao=ord[a.kind+":"+a.id], bo=ord[b.kind+":"+b.id];
+        if(ao!=null&&bo!=null) return ao-bo; if(ao!=null) return -1; if(bo!=null) return 1;
+        return (a.date||"9999").localeCompare(b.date||"9999");
+      });
+    }
+    out+='<div class="cc-kan-col" data-stage="'+st+'"><div class="cc-board-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<span class="cc-board-title">'+SCENE_COL_LABEL[st]+'</span><span class="cc-board-count">'+total+'</span></div><div class="cc-kan-stack">';
+    if(inCol.length){ inCol.forEach(function(sc){ out+=sceneKanCard(sc); }); }
     else { out+='<div class="cc-board-empty">Nothing here yet</div>'; }
     out+='</div>';
+    if(st==="released" && total>5){
+      out+='<button class="cc-ghost full" data-action="toggle-released-scenes" style="margin-top:12px">'+(S.showReleasedScenes?'Show fewer':'Show all ('+total+')')+'</button>';
+    }
+    out+='</div>';
   });
-  return out;
-}
-function sceneListCard(sc){
-  var col=SCENE_COL_COLOR[sc.stage]||"#888";
-  var openAction = sc.kind==="release" ? "open-rel" : "vault-schedule";
-  return '<div class="cc-vault-item">'
-    +'<div class="cc-vault-main" data-action="'+openAction+'" data-id="'+sc.id+'" style="cursor:pointer;flex:1;min-width:0">'
-      +'<div class="cc-vault-name">'+esc(sc.name)+'</div>'
-      +'<div class="cc-vault-meta">'+sceneBadges(sc)+'</div>'
-    +'</div>'
-    +(sc.kind==="vault"?'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+sc.id+'">'+ic("clock",15)+' Schedule</button>':"")
-    +(sc.stage!=="released"?'<button class="cc-icon-btn" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" title="Change stage"><span class="cc-status-dot" style="background:'+col+'"></span></button>'
-      :'<span class="cc-status-dot" style="background:'+col+'"></span>')
-    +(sc.kind==="vault"?'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+sc.id+'">'+ic("trash",16)+'</button>':"")
-  +'</div>';
+  return out+'</div>';
 }
 var CTAS = ["Subscribe","Renew","Presale","Tip","Comment","Profile Click","None"];
 var WD = ["S","M","T","W","T","F","S"];
@@ -793,7 +808,7 @@ var S = {
   wiz:null, wizOpen:false,
   vault:[], vaultSchedule:null, handoff:null,
   calVaultPick:null, vaultSchedDate:null, calDay:null,
-  sceneStageMenu:null, sceneView:"list", showReleasedScenes:false, pendingCollabLink:null,
+  sceneStageMenu:null, vaultNewStage:"editing", sceneView:"list", showReleasedScenes:false, pendingCollabLink:null,
   releaseDay:null, myPlatforms:null,
   plan:null, trialEnds:null, access:"unknown",
   collabs:[], collabEdit:null, planName:"", statusMenu:null, showPast:false, vaultNew:false,
@@ -802,7 +817,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v67";
+var APP_VERSION = "v68";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1270,8 +1285,8 @@ function collabToRelease(cid){
   flash("Name prefilled from your collab — pick a drop date and generate.");
   render();
 }
-function addVault(name,platforms,stageIds,exclusive,notes,sourceCollabId){
-  var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:notes||"",exclusive:exclusive||null,createdAt:Date.now(),stage:"idea",sourceCollabId:sourceCollabId||null};
+function addVault(name,platforms,stageIds,exclusive,notes,sourceCollabId,stage){
+  var v={id:uid(),name:name,platforms:platforms.slice(),stageIds:stageIds.slice(),notes:notes||"",exclusive:exclusive||null,createdAt:Date.now(),stage:stage||"editing",sourceCollabId:sourceCollabId||null};
   S.vault.push(v);
   flash('"'+name+'" saved to your Vault.');
   if(sb)sb.from("vault").insert(vaultToDb(v)).then(function(r){ if(r.error)sbErr(r.error); });
@@ -1727,37 +1742,9 @@ function planView(){
 
 function vaultView(){
   var all=allScenes();
-  var toggle='<div class="cc-toggle"><button class="'+(S.sceneView!=="board"?"on":"")+'" data-action="sceneview" data-v="list">List</button>'
-    +'<button class="'+(S.sceneView==="board"?"on":"")+'" data-action="sceneview" data-v="board">Board</button></div>';
-  var inner='<button class="cc-primary" data-action="vault-new-open">'+ic("plus",16)+' Add a scene to the Vault</button>'+toggle;
-  if(S.sceneView==="board"){
-    if(all.length){ inner+=sceneBoard(); } else { inner+=empty("vault","No scenes yet. Add an idea, or turn a collab into one."); }
-    return section("Scenes","Every scene, wherever it is in your pipeline. Tap the dot to move its stage.",inner);
-  }
-  var GROUPS=[
-    {st:"idea",title:"Ideas",hint:"Concepts you haven't shot yet."},
-    {st:"editing",title:"Needs editing",hint:"Shot, waiting on edits."},
-    {st:"ready",title:"Ready to post",hint:"Finished. Schedule these, or post the ones already on the calendar."}
-  ];
-  var any=false;
-  GROUPS.forEach(function(g){
-    var items=all.filter(function(sc){return sc.stage===g.st;}).sort(function(a,b){
-      if(!a.date && b.date) return -1; if(a.date && !b.date) return 1; return (a.date||"").localeCompare(b.date||"");
-    });
-    if(!items.length) return;
-    any=true;
-    inner+='<h3 class="cc-sub-h"><span class="cc-status-dot" style="background:'+SCENE_COL_COLOR[g.st]+';display:inline-block;margin-right:8px"></span>'+g.title+' <span class="cc-dim">('+items.length+')</span></h3>'
-      +'<p class="cc-note" style="margin:-4px 4px 8px">'+g.hint+'</p>';
-    items.forEach(function(sc){ inner+=sceneListCard(sc); });
-  });
-  var released=all.filter(function(sc){return sc.stage==="released";});
-  if(!any && !released.length){ inner+=empty("vault","No scenes yet. Tap <b>Add a scene to the Vault</b> above to park an idea until you're ready to pick a date."); }
-  if(released.length){
-    inner+='<button class="cc-ghost full" data-action="toggle-released-scenes" style="margin-top:18px">'
-      +(S.showReleasedScenes?ic("chevR",15)+' Hide released':ic("check",15)+' Show released ('+released.length+')')+'</button>';
-    if(S.showReleasedScenes){ inner+='<div style="margin-top:10px">'; released.forEach(function(sc){inner+=sceneListCard(sc);}); inner+='</div>'; }
-  }
-  return section("Scenes","Every scene, wherever it is in your pipeline — park an idea here, or tap a stage dot to move it along.",inner);
+  var inner='<button class="cc-primary" data-action="vault-new-open">'+ic("plus",16)+' Add a scene to the Vault</button>';
+  if(all.length){ inner+=sceneBoard(); } else { inner+=empty("vault","No scenes yet. Tap <b>Add a scene to the Vault</b> above, or turn a collab into one."); }
+  return section("Scenes","Press and hold a card, then drag it to another column. Tap a card to open it.",inner);
 }
 
 function moreView(){
@@ -1891,6 +1878,9 @@ function vaultNewModal(){
     +'<div class="cc-modal-head"><h2 class="cc-h2" style="margin:0">Add to Vault</h2><button class="cc-icon-btn" data-action="close-vault-new">'+ic("x")+'</button></div>'
     +'<p class="cc-note" style="margin:0 0 14px">Just get the idea down. You\'ll pick the date, platforms and template when you schedule it.</p>'
     +'<label class="cc-field"><span>Scene name</span><input id="v_name" class="cc-input" placeholder="e.g. Hotel shoot with Andy"></label>'
+    +'<div class="cc-field"><span>Where is it at?</span><div class="cc-wrap" id="v_stage" style="display:flex;gap:6px">'
+      +["idea","editing","ready"].map(function(st){ return '<button type="button" class="cc-chip vstage'+(S.vaultNewStage===st?" on":"")+'" data-action="vnew-stage" data-id="'+st+'">'+({idea:"Idea",editing:"Shot, needs editing",ready:"Ready to post"})[st]+'</button>'; }).join("")
+    +'</div></div>'
     +'<label class="cc-field"><span>Notes <span style="color:var(--mut2);font-weight:400">— optional</span></span><textarea id="v_notes" class="cc-input" rows="3" placeholder="Anything worth remembering — angle, outfit, who\'s in it…"></textarea></label>'
     +(S.collabs.length?'<label class="cc-field"><span>Linked to a collab <span style="color:var(--mut2);font-weight:400">— optional</span></span><select id="v_collab" class="cc-input"><option value="">Not linked</option>'
       +S.collabs.filter(function(c){return c.status!=="Canceled";}).map(function(c){return '<option value="'+c.id+'">'+esc(c.partner)+' — '+esc(fmtDate(c.date))+'</option>';}).join("")
@@ -2162,6 +2152,7 @@ function sceneStageMenuModal(){
     +'<p class="cc-note" style="margin:0 0 12px">'+esc(obj.name)+'</p>'
     +rows
     +(eff==="released"?'<p class="cc-note" style="margin-top:12px">Marked Released automatically — every post is Posted.</p>':"")
+    +(kind==="vault"?'<button class="cc-ghost full" data-action="scene-del" data-id="'+id+'" style="margin-top:12px;color:#e0707f">'+ic("trash",15)+' Delete this scene</button>':"")
     +'</div></div>';
 }
 function setSceneStage(kind,id,st){
@@ -2678,6 +2669,98 @@ function blankPost(){return {id:uid(),releaseId:null,title:"",date:todayStr(),ti
   if(window.visualViewport){ window.visualViewport.addEventListener("resize",unstick); window.visualViewport.addEventListener("scroll",unstick); }
 })();
 
+
+/* ====================== VAULT KANBAN DRAG ====================== */
+var DRAG=null, DRAG_END=0;
+function kanObj(kind,id){ return (kind==="vault"?S.vault:S.releases).filter(function(x){return x.id===id;})[0]; }
+function kanStart(d){
+  d.active=true;
+  var r=d.card.getBoundingClientRect();
+  d.ox=d.sx-r.left; d.oy=d.sy-r.top;
+  var g=d.card.cloneNode(true); g.className="cc-kan-card cc-kan-ghost"; g.removeAttribute("data-action"); g.removeAttribute("data-drag");
+  g.style.width=r.width+"px"; g.style.left=r.left+"px"; g.style.top=r.top+"px"; g.style.marginTop="0";
+  document.body.appendChild(g); d.ghost=g;
+  d.card.classList.add("dragging"); document.body.classList.add("cc-dragging");
+  try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  var tick=function(){
+    if(!DRAG||!DRAG.active) return;
+    var wrap=document.querySelector(".cc-kan");
+    if(wrap){ var wr=wrap.getBoundingClientRect();
+      if(DRAG.x<wr.left+56) wrap.scrollLeft-=14; else if(DRAG.x>wr.right-56) wrap.scrollLeft+=14; }
+    if(DRAG.y<80) window.scrollBy(0,-12); else if(DRAG.y>window.innerHeight-80) window.scrollBy(0,12);
+    kanTarget(); d.raf=requestAnimationFrame(tick);
+  };
+  d.raf=requestAnimationFrame(tick);
+}
+function kanClear(){
+  document.querySelectorAll(".cc-kan-col.over,.cc-kan-col.no,.cc-kan-col.drop-end").forEach(function(c){c.classList.remove("over","no","drop-end");});
+  document.querySelectorAll(".cc-kan-card.drop-before").forEach(function(c){c.classList.remove("drop-before");});
+}
+function kanTarget(){
+  var d=DRAG; if(!d||!d.active) return null;
+  d.ghost.style.left=(d.x-d.ox)+"px"; d.ghost.style.top=(d.y-d.oy)+"px";
+  kanClear();
+  var hit=document.elementFromPoint(d.x,d.y); var col=hit&&hit.closest?hit.closest(".cc-kan-col"):null;
+  d.tcol=null; d.tidx=0;
+  if(!col) return null;
+  var st=col.getAttribute("data-stage");
+  if(st==="released"){ col.classList.add("no"); return null; }
+  col.classList.add("over");
+  var cards=[].slice.call(col.querySelectorAll(".cc-kan-card")).filter(function(c){return c!==d.card;});
+  var idx=0; cards.forEach(function(c){ var r=c.getBoundingClientRect(); if(r.top+r.height*0.4<d.y) idx++; });
+  if(idx<cards.length) cards[idx].classList.add("drop-before"); else col.classList.add("drop-end");
+  d.tcol=col; d.tidx=idx; d.tcards=cards;
+  return col;
+}
+function kanFinish(d,drop){
+  if(d.timer) clearTimeout(d.timer);
+  if(d.raf) cancelAnimationFrame(d.raf);
+  var col=d.active&&drop?d.tcol:null;
+  if(d.active){
+    DRAG_END=Date.now();
+    if(d.ghost&&d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
+    d.card.classList.remove("dragging"); document.body.classList.remove("cc-dragging");
+  }
+  var hitReleased=d.active&&drop&&!col&&(function(){ var h=document.elementFromPoint(d.x,d.y); var c=h&&h.closest?h.closest(".cc-kan-col"):null; return c&&c.getAttribute("data-stage")==="released"; })();
+  kanClear(); DRAG=null;
+  if(hitReleased){ flash("Scenes move to Released on their own once every post is Posted."); return; }
+  if(!col) return;
+  var st=col.getAttribute("data-stage"), kind=d.card.getAttribute("data-kind"), id=d.card.getAttribute("data-sid");
+  var obj=kanObj(kind,id); if(!obj) return;
+  var list=d.tcards.map(function(c){return {kind:c.getAttribute("data-kind"),id:c.getAttribute("data-sid")};});
+  list.splice(d.tidx,0,{kind:kind,id:id});
+  var ord=sceneOrderLoad(); list.forEach(function(it,i){ ord[it.kind+":"+it.id]=i; }); sceneOrderSave(ord);
+  var cur=sceneEffectiveStage(obj,kind==="release");
+  if(cur!==st){
+    obj.stage=st; flash("Moved to "+SCENE_COL_LABEL[st]+".");
+    if(sb) sb.from(kind==="vault"?"vault":"releases").update({stage:st}).eq("id",id).then(function(r){ if(r.error)sbErr(r.error); });
+  }
+  render();
+}
+document.addEventListener("pointerdown",function(e){
+  if(e.button>0||!e.target.closest) return;
+  var card=e.target.closest(".cc-kan-card[data-drag]"); if(!card||e.target.closest(".cc-kan-dot")) return;
+  if(DRAG) kanFinish(DRAG,false);
+  var d={card:card,sx:e.clientX,sy:e.clientY,x:e.clientX,y:e.clientY,touch:e.pointerType!=="mouse",active:false};
+  if(d.touch) d.timer=setTimeout(function(){ if(DRAG===d&&!d.active) kanStart(d); },380);
+  DRAG=d;
+});
+document.addEventListener("pointermove",function(e){
+  var d=DRAG; if(!d) return;
+  d.x=e.clientX; d.y=e.clientY;
+  if(!d.active){
+    if(Math.abs(d.x-d.sx)+Math.abs(d.y-d.sy)>8){
+      if(d.touch){ clearTimeout(d.timer); DRAG=null; } else kanStart(d);
+    }
+    return;
+  }
+  e.preventDefault(); kanTarget();
+});
+document.addEventListener("pointerup",function(){ if(DRAG) kanFinish(DRAG,true); });
+document.addEventListener("pointercancel",function(){ if(DRAG) kanFinish(DRAG,false); });
+document.addEventListener("touchmove",function(e){ if(DRAG&&DRAG.active) e.preventDefault(); },{passive:false});
+document.addEventListener("contextmenu",function(e){ if(e.target.closest&&e.target.closest(".cc-kan-card")) e.preventDefault(); });
+document.addEventListener("click",function(e){ if(Date.now()-DRAG_END<450){ e.stopPropagation(); e.preventDefault(); } },true);
 document.addEventListener("click",function(e){
   var el=e.target.closest("[data-action]"); if(!el)return;
   var a=el.getAttribute("data-action"), id=el.getAttribute("data-id");
@@ -2705,7 +2788,8 @@ document.addEventListener("click",function(e){
   if(a==="tab"){ S.tab=el.getAttribute("data-tab"); if(S.tab==="releases")S.openRelease=null; render(); return; }
   if(a==="add"){ S.editing=blankPost(); render(); return; }
   if(a==="edit"){ var p=S.posts.filter(function(x){return x.id===id;})[0]; if(p){S.editing=Object.assign({},p);render();} return; }
-  if(a==="vault-new-open"){ resetVaultSel(); S.vaultNew=true; render(); return; }
+  if(a==="vault-new-open"){ resetVaultSel(); S.vaultNew=true; S.vaultNewStage="editing"; render(); return; }
+  if(a==="vnew-stage"){ S.vaultNewStage=id; var chs=document.querySelectorAll("#v_stage .cc-chip"); for(var ci=0;ci<chs.length;ci++){ chs[ci].classList.toggle("on",chs[ci].getAttribute("data-id")===id); } return; }
   if(a==="close-vault-new"){ if(el.classList.contains("cc-modal-bg") && e.target!==el) return; S.vaultNew=false; render(); return; }
   if(a==="vpill-plat"){ var vp=el.getAttribute("data-v"); var vi=vaultSel.platforms.indexOf(vp); if(vi>=0)vaultSel.platforms.splice(vi,1);else vaultSel.platforms.push(vp); el.classList.toggle("on"); return; }
   if(a==="vpill-stage"){ var vs=el.getAttribute("data-v"); var vj=vaultSel.stages.indexOf(vs); if(vj>=0)vaultSel.stages.splice(vj,1);else vaultSel.stages.push(vs); el.classList.toggle("on"); return; }
@@ -2714,7 +2798,7 @@ document.addEventListener("click",function(e){
     if(!vn){ flash("Give the scene a name first."); return; }
     var vnotes=($("v_notes")&&$("v_notes").value||"").trim();
     var vcollab=($("v_collab")&&$("v_collab").value)||null;
-    addVault(vn, [], [], null, vnotes, vcollab);
+    addVault(vn, [], [], null, vnotes, vcollab, S.vaultNewStage||"editing");
     S.vaultNew=false; render(); return;
   }
   if(a==="collabview"){ S.collabView=el.getAttribute("data-v"); render(); return; }
@@ -2817,7 +2901,7 @@ document.addEventListener("click",function(e){
   }
   if(a==="collab-to-vault"){
     var cv=S.collabs.filter(function(x){return x.id===id;})[0]; if(!cv) return;
-    addVault(cv.partner, [], [], null, "", cv.id);
+    addVault(cv.partner, [], [], null, "", cv.id, "editing");
     flash('Scene "'+cv.partner+'" created in your Vault.');
     S.collabEdit=null; render(); return;
   }
@@ -2857,6 +2941,7 @@ document.addEventListener("click",function(e){
     scheduleVaultItem(vid,vd,vaultSel.platforms.slice(),vsordered,vsexcl,vsitem?vsitem.stage:"ready",vsitem?vsitem.sourceCollabId:null);
     return;
   }
+  if(a==="scene-del"){ S.sceneStageMenu=null; ask("Remove this scene from your Vault?",function(){deleteVault(id);},"Remove"); return; }
   if(a==="vault-del"){ ask("Remove this scene from your Vault?",function(){deleteVault(id);},"Remove"); return; }
   if(a==="save-post"){ savePostFromForm(); return; }
   if(a==="del-post"){ ask("Delete this post?",function(){deletePost(id);},"Delete"); return; }
