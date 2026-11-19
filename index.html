@@ -643,8 +643,10 @@ function sceneListCard(sc){
       +'<div class="cc-vault-name">'+esc(sc.name)+'</div>'
       +'<div class="cc-vault-meta">'+sceneBadges(sc)+'</div>'
     +'</div>'
-    +(sc.stage!=="released"?'<button class="cc-icon-btn" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'"><span class="cc-status-dot" style="background:'+col+'"></span></button>'
+    +(sc.kind==="vault"?'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+sc.id+'">'+ic("clock",15)+' Schedule</button>':"")
+    +(sc.stage!=="released"?'<button class="cc-icon-btn" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" title="Change stage"><span class="cc-status-dot" style="background:'+col+'"></span></button>'
       :'<span class="cc-status-dot" style="background:'+col+'"></span>')
+    +(sc.kind==="vault"?'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+sc.id+'">'+ic("trash",16)+'</button>':"")
   +'</div>';
 }
 var CTAS = ["Subscribe","Renew","Presale","Tip","Comment","Profile Click","None"];
@@ -800,7 +802,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v66";
+var APP_VERSION = "v67";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -1732,28 +1734,28 @@ function vaultView(){
     if(all.length){ inner+=sceneBoard(); } else { inner+=empty("vault","No scenes yet. Add an idea, or turn a collab into one."); }
     return section("Scenes","Every scene, wherever it is in your pipeline. Tap the dot to move its stage.",inner);
   }
-  var attention=all.filter(function(sc){return sc.stage==="idea"||sc.stage==="editing";});
-  var readyOnes=all.filter(function(sc){return sc.stage==="ready";});
+  var GROUPS=[
+    {st:"idea",title:"Ideas",hint:"Concepts you haven't shot yet."},
+    {st:"editing",title:"Needs editing",hint:"Shot, waiting on edits."},
+    {st:"ready",title:"Ready to post",hint:"Finished. Schedule these, or post the ones already on the calendar."}
+  ];
+  var any=false;
+  GROUPS.forEach(function(g){
+    var items=all.filter(function(sc){return sc.stage===g.st;}).sort(function(a,b){
+      if(!a.date && b.date) return -1; if(a.date && !b.date) return 1; return (a.date||"").localeCompare(b.date||"");
+    });
+    if(!items.length) return;
+    any=true;
+    inner+='<h3 class="cc-sub-h"><span class="cc-status-dot" style="background:'+SCENE_COL_COLOR[g.st]+';display:inline-block;margin-right:8px"></span>'+g.title+' <span class="cc-dim">('+items.length+')</span></h3>'
+      +'<p class="cc-note" style="margin:-4px 4px 8px">'+g.hint+'</p>';
+    items.forEach(function(sc){ inner+=sceneListCard(sc); });
+  });
   var released=all.filter(function(sc){return sc.stage==="released";});
-  if(attention.length){ inner+='<h3 class="cc-sub-h">Needs attention</h3>'; attention.forEach(function(sc){inner+=sceneListCard(sc);}); }
-  if(readyOnes.length){ inner+='<h3 class="cc-sub-h">Ready to post</h3>'; readyOnes.forEach(function(sc){inner+=sceneListCard(sc);}); }
-  if(!attention.length && !readyOnes.length){ inner+=empty("vault","No scenes yet. Add an idea, or turn a collab into one."); }
+  if(!any && !released.length){ inner+=empty("vault","No scenes yet. Tap <b>Add a scene to the Vault</b> above to park an idea until you're ready to pick a date."); }
   if(released.length){
-    inner+='<button class="cc-ghost full" data-action="toggle-released-scenes" style="margin-top:16px">'
+    inner+='<button class="cc-ghost full" data-action="toggle-released-scenes" style="margin-top:18px">'
       +(S.showReleasedScenes?ic("chevR",15)+' Hide released':ic("check",15)+' Show released ('+released.length+')')+'</button>';
     if(S.showReleasedScenes){ inner+='<div style="margin-top:10px">'; released.forEach(function(sc){inner+=sceneListCard(sc);}); inner+='</div>'; }
-  }
-  if(S.vault.length){
-    S.vault.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(v){
-      inner+='<div class="cc-vault-item">'
-        +'<div class="cc-vault-main"><div class="cc-vault-name">'+esc(v.name)+(v.exclusive?' <span class="cc-excl-tag">'+ic("lock",10)+' '+esc(v.exclusive)+'</span>':"")+'</div>'
-          +(v.notes?'<div class="cc-vault-meta">'+esc(v.notes)+'</div>':"")+'</div>'
-        +'<button class="cc-vault-go" data-action="vault-schedule" data-id="'+v.id+'">'+ic("clock",15)+' Schedule</button>'
-        +'<button class="cc-icon-btn danger" data-action="vault-del" data-id="'+v.id+'">'+ic("trash",16)+'</button>'
-      +'</div>';
-    });
-  } else {
-    inner+=empty("layers","No saved scenes yet. Tap <b>Add a scene to the Vault</b> above to park one until you're ready to pick a date.");
   }
   return section("Scenes","Every scene, wherever it is in your pipeline — park an idea here, or tap a stage dot to move it along.",inner);
 }
