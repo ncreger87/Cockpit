@@ -124,9 +124,11 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .cc-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
 .cc-field>span{font-size:12px;color:var(--mut);font-weight:500;padding-left:2px;}
 .cc-input{background:var(--card);border:1px solid var(--line2);border-radius:11px;color:var(--txt);font-size:15px;padding:11px 13px;width:100%;outline:none;transition:.15s;}
-input[type="date"].cc-input::-webkit-calendar-picker-indicator{filter:invert(1) brightness(1.6);opacity:.85;cursor:pointer;}
+input[type="date"].cc-input::-webkit-calendar-picker-indicator{filter:none;opacity:.9;cursor:pointer;}
+input[type="date"].cc-input{cursor:pointer;}
 input[type="date"].cc-input::-webkit-calendar-picker-indicator:hover{opacity:1;}
 input[type="date"].cc-input{color-scheme:dark;}
+input[type="time"].cc-input,input[type="datetime-local"].cc-input{color-scheme:dark;}
 .cc-input:focus{border-color:var(--accent);}
 textarea.cc-input{resize:vertical;line-height:1.45;}
 .cc-two{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
@@ -337,20 +339,25 @@ textarea.cc-input{resize:vertical;line-height:1.45;}
   font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap;}
 .cc-postnow:active{transform:scale(.95);}
 /* vault kanban */
-.cc-kan{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 16px;-webkit-overflow-scrolling:touch;align-items:flex-start;margin-top:4px;}
-.cc-kan-col{flex:0 0 min(78vw,290px);scroll-snap-align:start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:16px;padding:12px 10px 16px;min-height:170px;transition:outline-color .12s;outline:2px solid transparent;box-sizing:border-box;}
+.cc-kan{display:flex;gap:5px;padding:2px 0 16px;align-items:flex-start;margin-top:4px;}
+.cc-kan-col{flex:1 1 0;min-width:0;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:8px 4px 12px;min-height:170px;transition:outline-color .12s;outline:2px solid transparent;box-sizing:border-box;}
 .cc-kan-col.over{outline-color:var(--accent);}
 .cc-kan-col.no{outline:2px dashed #c0566a;}
 .cc-kan-col.drop-end .cc-kan-stack{box-shadow:inset 0 -3px 0 var(--accent);}
+.cc-kan-head{display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 0 8px;text-align:center;}
+.cc-kan-head b{font-family:var(--serif);font-size:12.5px;color:var(--txt);line-height:1.1;}
+.cc-kan-head i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:1px 7px;}
 .cc-kan-stack{padding-top:2px;min-height:60px;}
-.cc-kan-card{position:relative;display:flex;align-items:flex-start;height:66px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:-16px;box-shadow:0 -3px 8px rgba(0,0,0,.3);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;box-sizing:border-box;overflow:hidden;}
+.cc-kan-card{position:relative;display:block;height:78px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-top:-8px;box-shadow:0 -3px 8px rgba(0,0,0,.3);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;box-sizing:border-box;overflow:hidden;}
 .cc-kan-card:first-child{margin-top:0;}
 .cc-kan-card:active{background:var(--card2);}
-.cc-kan-card .main{flex:1;min-width:0;padding:9px 4px 0 14px;}
-.cc-kan-dot{width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--mut);cursor:pointer;margin:2px 2px 0 0;}
+.cc-kan-card .main{padding:6px 5px 0 7px;}
+.cc-kan-card .cc-board-name{font-size:12.5px;line-height:1.2;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-right:14px;}
+.cc-kan-card .cc-board-meta{font-size:10.5px;margin-top:2px;}
+.cc-kan-dot{position:absolute;top:0;right:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--mut);cursor:pointer;padding:0;}
 .cc-kan-card.dragging{opacity:.3;}
-.cc-kan-card.drop-before::before{content:"";position:absolute;left:8px;right:8px;top:0;height:3px;background:var(--accent);border-radius:3px;z-index:2;}
-.cc-kan-ghost{position:fixed;z-index:9999;pointer-events:none;margin:0 !important;transform:rotate(2deg) scale(1.03);box-shadow:0 14px 30px rgba(0,0,0,.55);opacity:.96;}
+.cc-kan-card.drop-before::before{content:"";position:absolute;left:6px;right:6px;top:0;height:3px;background:var(--accent);border-radius:3px;z-index:2;}
+.cc-kan-ghost{position:fixed;z-index:9999;pointer-events:none;margin:0 !important;transform:rotate(2deg) scale(1.05);box-shadow:0 14px 30px rgba(0,0,0,.55);opacity:.96;}
 body.cc-dragging{user-select:none;-webkit-user-select:none;}
 .cc-chip.vstage{flex:1;text-align:center;}
 /* collab board */
@@ -632,8 +639,8 @@ function sceneOrderSave(m){ try{ localStorage.setItem("cc_scene_order",JSON.stri
 function sceneKanCard(sc){
   var openAction = sc.kind==="release" ? "open-rel" : "vault-schedule";
   return '<div class="cc-kan-card" data-sid="'+sc.id+'" data-kind="'+sc.kind+'"'+(sc.stage!=="released"?' data-drag="1"':'')+' data-action="'+openAction+'" data-id="'+sc.id+'">'
-    +'<div class="main"><div class="cc-board-name">'+esc(sc.name)+'</div><div class="cc-board-meta">'+sceneBadges(sc)+'</div></div>'
-    +'<button class="cc-kan-dot" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" aria-label="Scene options">'+ic("more",18)+'</button>'
+    +'<div class="main"><div class="cc-board-name">'+esc(sc.name)+'</div><div class="cc-board-meta">'+(sc.date?fmtDate(sc.date):"No date")+'</div></div>'
+    +'<button class="cc-kan-dot" data-action="scene-stage-menu" data-id="'+sc.kind+':'+sc.id+'" aria-label="Scene options">'+ic("more",14)+'</button>'
   +'</div>';
 }
 function sceneBoard(){
@@ -652,8 +659,8 @@ function sceneBoard(){
         return (a.date||"9999").localeCompare(b.date||"9999");
       });
     }
-    out+='<div class="cc-kan-col" data-stage="'+st+'"><div class="cc-board-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
-      +'<span class="cc-board-title">'+SCENE_COL_LABEL[st]+'</span><span class="cc-board-count">'+total+'</span></div><div class="cc-kan-stack">';
+    out+='<div class="cc-kan-col" data-stage="'+st+'"><div class="cc-kan-head"><span class="cc-status-dot" style="background:'+col+'"></span>'
+      +'<b>'+({idea:"Idea",editing:"Shot",ready:"Ready",released:"Released"})[st]+'</b><i>'+total+'</i></div><div class="cc-kan-stack">';
     if(inCol.length){ inCol.forEach(function(sc){ out+=sceneKanCard(sc); }); }
     else { out+='<div class="cc-board-empty">Nothing here yet</div>'; }
     out+='</div>';
@@ -817,7 +824,7 @@ var S = {
   trips:[], tripView:null, tripForm:null, ledgerExpenses:[]
 };
 var TRIAL_DAYS = 7;
-var APP_VERSION = "v69";
+var APP_VERSION = "v70";
 var planSel = {platforms:["OnlyFans","JustForFans","X","Bluesky","Instagram","TikTok","Reddit"], stages:DEFAULT_STAGES.map(function(s){return s.id;})};
 function templatePlatformUnion(){
   var set={}; S.stages.forEach(function(s){ (s.platforms||[]).forEach(function(p){ set[p]=true; }); });
@@ -2763,6 +2770,9 @@ document.addEventListener("pointerup",function(){ if(DRAG) kanFinish(DRAG,true);
 document.addEventListener("pointercancel",function(){ if(DRAG) kanFinish(DRAG,false); });
 document.addEventListener("touchmove",function(e){ if(DRAG&&DRAG.active) e.preventDefault(); },{passive:false});
 document.addEventListener("contextmenu",function(e){ if(e.target.closest&&e.target.closest(".cc-kan-card")) e.preventDefault(); });
+document.addEventListener("click",function(e){
+  var t=e.target; if(t&&t.tagName==="INPUT"&&t.type==="date"&&t.showPicker){ try{ t.showPicker(); }catch(_){} }
+});
 document.addEventListener("click",function(e){ if(Date.now()-DRAG_END<450){ e.stopPropagation(); e.preventDefault(); } },true);
 document.addEventListener("click",function(e){
   var el=e.target.closest("[data-action]"); if(!el)return;
